@@ -5,71 +5,98 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>航廈教育訓練統計儀表板</title>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; color: #333; }
-    h1 { text-align: center; color: #2c3e50; font-weight: bold; margin-bottom: 30px; }
+    :root {
+      --primary-color: #0056b3;
+      --secondary-color: #28a745;
+      --accent-color: #d39e00;
+      --bg-color: #f4f7f6;
+      --table-header: #f8f9fa;
+      --table-border: #dee2e6;
+    }
+
+    body { font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: var(--bg-color); padding: 20px; color: #333; margin: 0; }
+    h1 { text-align: center; color: var(--primary-color); font-weight: 700; margin-bottom: 30px; text-shadow: 1px 1px 2px rgba(0,0,0,0.05); }
     
-    .tab-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 25px; justify-content: center; }
-    .tab-btn { padding: 10px 25px; cursor: pointer; border: 2px solid #0056b3; background: #fff; color: #0056b3; border-radius: 8px; font-size: 16px; font-weight: bold; transition: all 0.2s; }
-    .tab-btn:hover { background: #e6f0fa; transform: translateY(-2px); }
-    .tab-btn.active { background: #0056b3; color: white; box-shadow: 0 4px 10px rgba(0,86,179,0.3); }
+    /* 頁籤設計 */
+    .tab-container { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 30px; justify-content: center; }
+    .tab-btn { 
+      padding: 12px 30px; cursor: pointer; border: 2px solid var(--primary-color); 
+      background: #fff; color: var(--primary-color); border-radius: 30px; 
+      font-size: 16px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .tab-btn:hover { background: #e6f0fa; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .tab-btn.active { background: var(--primary-color); color: white; box-shadow: 0 4px 12px rgba(0,86,179,0.3); }
     
-    .year-section { display: none; animation: fadeIn 0.4s ease-in-out; }
+    .year-section { display: none; animation: fadeIn 0.5s ease-in-out; }
     .year-section.active { display: block; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-    .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-    .card-total { border-top: 5px solid #28a745; }
-    .card-course { border-top: 5px solid #ffc107; }
-    h2 { color: #0056b3; border-left: 4px solid #0056b3; padding-left: 10px; margin-top: 0; }
-    .title-total { color: #28a745; border-color: #28a745; }
-    .title-course { color: #d39e00; border-color: #ffc107; }
-
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: center; }
-    th { background-color: #f8f9fa; color: #495057; font-weight: 600; }
-    .total-col { background-color: #eef2f5; font-weight: bold; color: #0056b3; }
+    /* 卡片設計 */
+    .card { background: #fff; border-radius: 12px; padding: 25px; margin-bottom: 35px; box-shadow: 0 6px 15px rgba(0,0,0,0.08); transition: transform 0.2s; }
+    .card:hover { transform: translateY(-2px); }
+    .card-total { border-top: 6px solid var(--secondary-color); }
+    .card-terminal { border-top: 6px solid var(--primary-color); }
+    .card-course { border-top: 6px solid #ffc107; }
     
-    .course-table th { background-color: #fff8e1; }
+    h2 { color: var(--primary-color); border-left: 5px solid var(--primary-color); padding-left: 12px; margin-top: 0; font-size: 1.4em; }
+    .title-total { color: var(--secondary-color); border-color: var(--secondary-color); }
+    .title-course { color: var(--accent-color); border-color: #ffc107; }
+
+    /* 表格設計 */
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; font-size: 15px; }
+    th, td { border: 1px solid var(--table-border); padding: 12px; text-align: center; vertical-align: middle; }
+    th { background-color: var(--table-header); color: #495057; font-weight: 600; }
+    .total-col { background-color: #eef2f5; font-weight: bold; color: var(--primary-color); }
+    .highlight-num { color: #d9534f; font-weight: bold; } /* 人數大於0時高亮 */
+
+    /* 排行榜表格 */
+    .course-table th { background-color: #fff8e1; color: #856404; }
     .course-table tr.clickable { cursor: pointer; transition: background 0.2s; }
-    .course-table tr.clickable:hover { background-color: #ffefc4; }
-    .rank-num { font-weight: bold; color: #666; }
-    .click-hint { font-size: 0.8em; color: #888; font-weight: normal; margin-left: 10px; }
+    .course-table tr.clickable:hover { background-color: #fff3cd; }
+    .rank-num { font-weight: bold; color: #6c757d; font-size: 1.1em; }
+    .click-hint { font-size: 0.8em; color: #6c757d; font-weight: normal; margin-left: 10px; background: #f8f9fa; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; }
 
-    .loading { text-align: center; padding: 40px; font-size: 1.2em; color: #666; }
+    .loading { text-align: center; padding: 50px; font-size: 1.3em; color: var(--primary-color); display: flex; flex-direction: column; align-items: center; gap: 15px; }
+    .loader-spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    /* 彈出視窗 (Modal) 樣式 */
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+    /* Modal 彈出視窗優化 */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
     .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
-    .modal-content { background: #fff; width: 90%; max-width: 600px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; }
-    .modal-header { background: #0056b3; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-    .modal-header h3 { margin: 0; font-size: 18px; }
-    .close-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; line-height: 1; }
-    .close-btn:hover { color: #ffcccc; }
-    .modal-body { padding: 20px; overflow-y: auto; }
-    .detail-table th { background: #eef2f5; position: sticky; top: 0; }
+    .modal-content { background: #f8f9fa; width: 95%; max-width: 1000px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; }
+    .modal-header { background: var(--primary-color); color: white; padding: 18px 25px; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { margin: 0; font-size: 20px; font-weight: 600; }
+    .close-btn { background: none; border: none; color: white; font-size: 28px; cursor: pointer; line-height: 1; transition: color 0.2s; }
+    .close-btn:hover { color: #ffcccc; transform: scale(1.1); }
+    .modal-body { padding: 25px; overflow-y: auto; }
+    
+    /* Modal 內的卡片 */
+    .modal-card { background: #fff; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid var(--primary-color); }
+    .modal-card h4 { margin: 0 0 15px 0; color: var(--primary-color); font-size: 1.1em; }
+    .modal-table th { background: #eef2f5; font-size: 14px; padding: 8px; }
+    .modal-table td { font-size: 14px; padding: 8px; }
+    .modal-empty { text-align: center; color: #6c757d; padding: 20px; }
   </style>
 </head>
 <body>
-  <h1>航廈教育訓練場次與人數統計</h1>
+  <h1>✈️ 桃園機場職安教育訓練儀表板</h1>
   <div id="app">
-    <div class="loading" id="loading">載入最新訓練數據中，請稍候...</div>
+    <div class="loading" id="loading">
+      <div class="loader-spinner"></div>
+      <div>正在連線至資料庫讀取最新數據...</div>
+    </div>
     <div id="content"></div>
   </div>
 
-  <!-- 彈出視窗 (用來顯示明細) -->
+  <!-- 彈出視窗 (Modal) -->
   <div class="modal-overlay" id="courseModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="modalCourseTitle">課程明細</h3>
+        <h3 id="modalCourseTitle">課程名稱</h3>
         <button class="close-btn" onclick="closeModal()">&times;</button>
       </div>
-      <div class="modal-body">
-        <table class="detail-table" id="modalTable">
-          <thead>
-            <tr><th>航廈</th><th>日期</th><th>班別</th><th>受訓人數</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+      <div class="modal-body" id="modalBody">
+        <!-- JS 將會在這裡動態生成一航與二航的統計表格 -->
       </div>
     </div>
   </div>
@@ -78,7 +105,7 @@
     // ⚠️ 記得將下方換成您最新發佈的 GAS 網頁應用程式網址
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXg47GxjMju-NFoGnOp6CO5AyFZZ6PrqKMH2qBI3CncaFFoTISIPT3TBiQ-2h_CFIVJw/exec';
 
-    // 🌟 SOP 歸類函數保留 🌟
+    // SOP 歸類函數 (維持不變)
     function normalizeCourseName(rawName) {
       if (!rawName) return "其他作業 - 未分類";
       let n = rawName.toString().trim().replace(/(教育訓練|宣導|教學|注意事項|規範|員工|測驗|敎育訓練|作業流程|處理流程|通報流程)$/g, "").replace(/敎育訓練/g, "").replace(/。/g, "").toLowerCase();
@@ -142,43 +169,116 @@
       return "其他作業 - " + rawName.toString().trim();
     }
 
-    // 顯示 Modal 明細
+    // 格式化數字 (0 不顯示高亮)
+    function formatNum(num) {
+      return num > 0 ? `<span class="highlight-num">${num}</span>` : "0";
+    }
+
+    // 🌟 Modal 核心：將明細陣列轉換為「分航廈、分月份、分班別」的統計表
     function showCourseDetails(courseName, detailsArray) {
-      document.getElementById('modalCourseTitle').textContent = courseName;
-      const tbody = document.querySelector('#modalTable tbody');
-      tbody.innerHTML = '';
+      document.getElementById('modalCourseTitle').textContent = `📄 ${courseName} - 詳細統計`;
+      const modalBody = document.getElementById('modalBody');
+      modalBody.innerHTML = '';
       
-      if(detailsArray && detailsArray.length > 0) {
-        // 依照航廈與日期稍微排序
-        detailsArray.sort((a, b) => a.terminal.localeCompare(b.terminal) || a.date.localeCompare(b.date));
+      if (!detailsArray || detailsArray.length === 0) {
+        modalBody.innerHTML = '<div class="modal-empty">暫無上課紀錄</div>';
+        document.getElementById('courseModal').classList.add('active');
+        return;
+      }
+
+      // 1. 將凌亂的明細重新依照 航廈 -> 月份 -> 班別 進行分類加總
+      const analyzedData = {};
+      
+      detailsArray.forEach(detail => {
+        const terminal = detail.terminal; // "一航" 或 "二航"
+        const shift = detail.shift;       // "早班", "中班", "夜班"
+        const people = parseInt(detail.people) || 0;
         
-        detailsArray.forEach(detail => {
+        // 從 "MM/dd" 提取出月份 "MM月"
+        let monthStr = "未知月";
+        if (detail.date && detail.date.includes('/')) {
+           const monthNum = detail.date.split('/')[0];
+           monthStr = `${monthNum}月`;
+        }
+
+        if (!analyzedData[terminal]) analyzedData[terminal] = {};
+        if (!analyzedData[terminal][monthStr]) {
+          analyzedData[terminal][monthStr] = { '早班': {s:0, p:0}, '中班': {s:0, p:0}, '夜班': {s:0, p:0} };
+        }
+        
+        if (analyzedData[terminal][monthStr][shift]) {
+          analyzedData[terminal][monthStr][shift].s += 1;
+          analyzedData[terminal][monthStr][shift].p += people;
+        }
+      });
+
+      // 2. 針對每一個航廈繪製獨立的統計卡片
+      const terminals = Object.keys(analyzedData).sort();
+      
+      terminals.forEach(terminal => {
+        const card = document.createElement('div');
+        card.className = 'modal-card';
+        card.innerHTML = `<h4>📍 ${terminal}</h4>`;
+        
+        const table = document.createElement('table');
+        table.className = 'modal-table';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th rowspan="2" width="15%">月份</th>
+              <th colspan="2">早班</th><th colspan="2">中班</th><th colspan="2">夜班</th><th colspan="2" class="total-col">合計</th>
+            </tr>
+            <tr>
+              <th>場次</th><th>人數</th><th>場次</th><th>人數</th><th>場次</th><th>人數</th><th class="total-col">場次</th><th class="total-col">人數</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        
+        const tbody = table.querySelector('tbody');
+        const monthsData = analyzedData[terminal];
+        const sortedMonths = Object.keys(monthsData).sort();
+        
+        let tSess = 0, tPeop = 0;
+
+        sortedMonths.forEach(month => {
+          const mData = monthsData[month];
+          const msSess = mData['早班'].s + mData['中班'].s + mData['夜班'].s;
+          const msPeop = mData['早班'].p + mData['中班'].p + mData['夜班'].p;
+          
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td>${detail.terminal}</td>
-            <td>${detail.date}</td>
-            <td>${detail.shift}</td>
-            <td>${detail.people} 人</td>
+            <td>${month}</td>
+            <td>${formatNum(mData['早班'].s)}</td><td>${formatNum(mData['早班'].p)}</td>
+            <td>${formatNum(mData['中班'].s)}</td><td>${formatNum(mData['中班'].p)}</td>
+            <td>${formatNum(mData['夜班'].s)}</td><td>${formatNum(mData['夜班'].p)}</td>
+            <td class="total-col">${formatNum(msSess)}</td><td class="total-col">${formatNum(msPeop)}</td>
           `;
           tbody.appendChild(tr);
+          tSess += msSess;
+          tPeop += msPeop;
         });
-      } else {
-        tbody.innerHTML = '<tr><td colspan="4">無詳細資料</td></tr>';
-      }
+
+        // 底部合計
+        const footer = document.createElement('tr');
+        footer.innerHTML = `
+          <td style="font-weight:bold; background:#eef2f5;">小計</td>
+          <td colspan="6" style="background:#eef2f5;"></td>
+          <td class="total-col">${tSess}</td><td class="total-col">${tPeop}</td>
+        `;
+        tbody.appendChild(footer);
+        
+        card.appendChild(table);
+        modalBody.appendChild(card);
+      });
+
       document.getElementById('courseModal').classList.add('active');
     }
 
-    // 關閉 Modal
-    function closeModal() {
-      document.getElementById('courseModal').classList.remove('active');
-    }
-    // 點擊背景關閉
-    window.onclick = function(event) {
-      const modal = document.getElementById('courseModal');
-      if (event.target === modal) closeModal();
-    }
+    function closeModal() { document.getElementById('courseModal').classList.remove('active'); }
+    window.onclick = function(event) { if (event.target === document.getElementById('courseModal')) closeModal(); }
 
-    // 產生月報表卡片
+    // 產生月報表卡片 (外層主頁面使用)
     function createStatsTable(monthsData, title, titleClass = "", cardClass = "") {
       const card = document.createElement('div');
       card.className = `card ${cardClass}`;
@@ -200,7 +300,7 @@
         let monthSessions = 0, monthPeople = 0;
         ['早班', '中班', '夜班'].forEach(shift => {
           const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
-          tr.innerHTML += `<td>${stats.sessions}</td><td>${stats.people}</td>`;
+          tr.innerHTML += `<td>${formatNum(stats.sessions)}</td><td>${formatNum(stats.people)}</td>`;
           monthSessions += stats.sessions;
           monthPeople += stats.people;
         });
@@ -216,7 +316,7 @@
       return card;
     }
 
-    // 主程式開始
+    // 主程式 API 讀取
     fetch(GAS_URL)
       .then(response => response.json())
       .then(data => {
@@ -234,7 +334,7 @@
         sortedYears.forEach(year => {
           const btn = document.createElement('button');
           btn.className = `tab-btn ${isFirst ? 'active' : ''}`;
-          btn.textContent = `${year}年度`;
+          btn.textContent = `📅 ${year}年度`;
           btn.onclick = () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.year-section').forEach(s => s.classList.remove('active'));
@@ -262,14 +362,14 @@
             }
           });
           if (Object.keys(combinedStats).length > 0) {
-            yearSection.appendChild(createStatsTable(combinedStats, "全區加總 (一航 ＋ 二航)", "title-total", "card-total"));
+            yearSection.appendChild(createStatsTable(combinedStats, "📊 全區加總 (一航 ＋ 二航)", "title-total", "card-total"));
           }
 
           terminals.forEach(terminal => {
-            yearSection.appendChild(createStatsTable(yearStats[terminal], terminal));
+            yearSection.appendChild(createStatsTable(yearStats[terminal], `📍 ${terminal}`, "", "card-terminal"));
           });
 
-          // 處理課程排行與明細收集
+          // 處理課程排行與明細
           const combinedCourses = {};
           terminals.forEach(terminal => {
             if (yearCourses[terminal]) {
@@ -280,7 +380,6 @@
                 }
                 combinedCourses[cleanCourseName].sessions += courseStats.sessions;
                 combinedCourses[cleanCourseName].people += courseStats.people;
-                // 將後端傳來的明細陣列合併進去
                 if (courseStats.details) {
                   combinedCourses[cleanCourseName].details.push(...courseStats.details);
                 }
@@ -296,19 +395,17 @@
           if (sortedCourses.length > 0) {
             const courseCard = document.createElement('div');
             courseCard.className = 'card card-course';
-            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (全區歸類後) <span class="click-hint">※ 點擊表格列可查看上課日期與明細</span></h2>`;
+            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (依 SOP 歸類) <span class="click-hint">👆 點擊表格任一列，可查看分航廈、月份、班別明細</span></h2>`;
             
             const courseTable = document.createElement('table');
             courseTable.className = 'course-table';
-            courseTable.innerHTML = `<thead><tr><th width="10%">排名</th><th width="50%" style="text-align: left;">訓練課程名稱 (依SOP歸類)</th><th width="20%">累計場次</th><th width="20%">受訓總人數</th></tr></thead><tbody></tbody>`;
+            courseTable.innerHTML = `<thead><tr><th width="10%">排名</th><th width="50%" style="text-align: left;">標準作業程序 (SOP) 名稱</th><th width="20%">年度累計場次</th><th width="20%">年度受訓總人數</th></tr></thead><tbody></tbody>`;
             
             const cTbody = courseTable.querySelector('tbody');
             sortedCourses.forEach((cName, index) => {
               const stats = combinedCourses[cName];
               const tr = document.createElement('tr');
-              tr.className = 'clickable'; // 加上可點擊的 class
-              tr.title = "點擊查看各航廈日期明細";
-              // 綁定點擊事件，觸發 Modal
+              tr.className = 'clickable'; 
               tr.onclick = () => showCourseDetails(cName, stats.details);
               
               tr.innerHTML = `
@@ -327,7 +424,7 @@
         });
       })
       .catch(error => {
-        document.getElementById('loading').textContent = '讀取失敗，請確認 Apps Script API 權限或網址是否正確。';
+        document.getElementById('loading').innerHTML = '<div style="color:red;">❌ 讀取失敗，請確認 Apps Script API 權限或網址是否正確。</div>';
         console.error('Error:', error);
       });
   </script>
