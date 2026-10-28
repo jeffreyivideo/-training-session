@@ -56,28 +56,68 @@
 
     // 🌟 新增：課程名稱統一歸類函數 🌟
     // 只要原始名稱包含特定「關鍵字」，就會被轉換成統一的標準名稱
+    // 🌟 加強版：課程名稱統一歸類函數 🌟
     function normalizeCourseName(rawName) {
       if (!rawName) return "其他/未分類";
       let n = rawName.toString().trim();
       
-      // --- 1. 關鍵字歸類規則 (您可以在此自由新增或修改) ---
-      if (n.includes("抹布") && (n.includes("分色") || n.includes("顏色"))) return "抹布分色與八折法使用";
-      if (n.includes("免治馬桶")) return "免治馬桶清潔與維護";
-      if (n.includes("垃圾報表")) return "垃圾報表處置宣導";
-      if (n.includes("警報按鈕") || n.includes("復歸")) return "警報按鈕復歸教學";
-      if (n.includes("小心地滑") || n.includes("吸水紙")) return "防滑與吸水紙使用注意事項";
-      if (n.includes("洗手間接觸點") || n.includes("鏡面及洗手台") || n.includes("擦手紙更換") || n.includes("潔具間")) return "洗手間各項設施清潔 (綜合)";
-      if (n.includes("地面清洗") || n.includes("洗地")) return "地面清洗作業安全防護";
-      if (n.includes("管制證")) return "管制證使用注意事項";
-      if (n.includes("禮儀") || n.includes("禮節")) return "服務禮儀與應對技巧";
-
-      // --- 2. 通用文字過濾 (如果上面沒命中，則自動清掉多餘的字尾) ---
-      // 把常見的贅字去掉，例如「XX教育訓練」跟「XX」就會自動變成一樣
-      n = n.replace(/教育訓練$/g, "");
-      n = n.replace(/宣導$/g, "");
-      n = n.replace(/教學$/g, "");
-      n = n.replace(/注意事項$/g, "");
+      // 先轉為小寫並清除常見贅字，方便後續比對
+      n = n.replace(/(教育訓練|宣導|教學|注意事項|規範|員工|測驗|敎育訓練|作業流程|處理流程|通報流程)$/g, "");
+      n = n.replace(/敎育訓練/g, "");
+      n = n.replace(/。/g, ""); // 去除句號
       
+      // 1. 廁所與洗手間清潔 (綜合)
+      if (n.includes("洗手間") || n.includes("公廁旅客接觸點") || n.includes("廁所旅客接觸點") || n.includes("智慧廁") || n.includes("廁所清洗") || n.includes("廁所設施設備")) return "洗手間與廁所設施清潔 (綜合)";
+      
+      // 2. 馬桶與小便斗
+      if (n.includes("免治馬桶")) return "免治馬桶清潔與維護";
+      if (n.includes("馬桶") && n.includes("小便斗")) return "馬桶與小便斗清洗維護";
+      if (n.includes("馬桶")) return "馬桶清洗維護";
+      if (n.includes("小便斗")) return "小便斗清洗維護";
+      
+      // 3. 抹布與擦拭法
+      if (n.includes("抹布") || n.includes("八折法")) return "抹布分色與八折法使用";
+      
+      // 4. 清潔車與工具
+      if (n.includes("推車") || n.includes("潔具車")) return "工作推車整潔維護與擺放";
+      if (n.includes("耗材") || n.includes("垃圾袋") || n.includes("擦手紙") || n.includes("洗手乳")) return "廁所耗材更換與維護";
+      
+      // 5. 垃圾桶與垃圾場
+      if (n.includes("垃圾桶") || n.includes("煙灰桶") || n.includes("菸灰桶")) return "垃圾桶與煙灰桶清潔 (含緊急處理)";
+      if (n.includes("垃圾場") || n.includes("垃圾車") || n.includes("資源回收") || n.includes("廚餘") || n.includes("㕑餘")) return "垃圾場作業與資源回收分類";
+      
+      // 6. 突發狀況與污漬處理
+      if (n.includes("嘔吐物") || n.includes("飲料") || n.includes("液體灑落")) return "嘔吐物與飲料打翻處理";
+      if (n.includes("漏水") || n.includes("滴水") || n.includes("爆管")) return "漏水與滴水處理";
+      if (n.includes("跌倒") || n.includes("滑倒")) return "防滑與跌倒/滑倒危害告知";
+      
+      // 7. 緊急按鈕與通報 (電扶梯/走道)
+      if (n.includes("電扶梯") || n.includes("電走道") || n.includes("緊急鈴") || n.includes("緊急按鈕")) return "電扶梯與電走道緊急按鈕操作";
+      if (n.includes("警報按鈕") || n.includes("緊急求救鈴") || n.includes("復歸") || n.includes("賦歸")) return "警報按鈕解除與復歸";
+      if (n.includes("異常") || n.includes("通報") || n.includes("31999") || n.includes("OCC")) return "異常狀況與設施設備損壞通報";
+      
+      // 8. 旅客服務與遺失物
+      if (n.includes("禮儀") || n.includes("敲門") || n.includes("旅客中英文")) return "服務禮儀與應對技巧";
+      if (n.includes("遺失物") || n.includes("無主行李")) return "拾獲遺失物與無主行李處理";
+      if (n.includes("可疑")) return "發現可疑人事物處理";
+      
+      // 9. 公區與地面清潔
+      if (n.includes("公區清消") || n.includes("候機室") || n.includes("大廳")) return "公區與候機室清消作業";
+      if (n.includes("地面清洗") || n.includes("洗地") || n.includes("地面污垢")) return "地面清洗作業與安全防護";
+      if (n.includes("鏡面") || n.includes("洗手台") || n.includes("洗手檯") || n.includes("水漬")) return "洗手台與鏡面水漬清理";
+      
+      // 10. KPI 與防護
+      if (n.includes("KPI") || n.includes("6+1")) return "6+1項 KPI 清消作業";
+      if (n.includes("防護") || n.includes("隔離衣")) return "安全防護裝備穿脫";
+      if (n.includes("管制證") || n.includes("通行證") || n.includes("門禁") || n.includes("管制門")) return "門禁管制與通行證使用注意事項";
+      if (n.includes("噴霧機") || n.includes("吸塵器") || n.includes("打蠟機") || n.includes("洗地機")) return "電動清潔機具操作 (噴霧/吸塵/打蠟)";
+      
+      // 11. 工安與防災
+      if (n.includes("火災") || n.includes("火警") || n.includes("滅火器") || n.includes("行動電源")) return "火警應變與滅火器使用";
+      if (n.includes("地震")) return "地震緊急應變";
+      if (n.includes("墜落") || n.includes("滾落")) return "墜落與滾落危害告知";
+      if (n.includes("AED") || n.includes("CPR")) return "CPR 及 AED 訓練";
+
       return n.trim();
     }
 
