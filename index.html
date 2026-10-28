@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>航廈教育訓練統計儀表板</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; color: #333; }
+    h1 { text-align: center; color: #2c3e50; font-weight: bold; }
+    .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    h2 { color: #0056b3; border-left: 4px solid #0056b3; padding-left: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: center; }
+    th { background-color: #f8f9fa; color: #495057; font-weight: 600; }
+    .total-col { background-color: #eef2f5; font-weight: bold; color: #0056b3; }
+    .loading { text-align: center; padding: 40px; font-size: 1.2em; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>航廈教育訓練場次與人數統計</h1>
+  <div id="app">
+    <div class="loading" id="loading">載入最新訓練數據中，請稍候...</div>
+    <div id="content"></div>
+  </div>
+
+  <script>
+    // ⚠️ 貼上您剛剛在 Google Apps Script 複製的網址
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXg47GxjMju-NFoGnOp6CO5AyFZZ6PrqKMH2qBI3CncaFFoTISIPT3TBiQ-2h_CFIVJw/exec';
+
+    fetch(GAS_URL)
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        const contentDiv = document.getElementById('content');
+        
+        // 遍歷各個工作表 (例如: 一航, 二航, 114年-一航)
+        for (const [sheetName, monthsData] of Object.entries(data)) {
+          const card = document.createElement('div');
+          card.className = 'card';
+          
+          card.innerHTML = `<h2>${sheetName}</h2>`;
+          
+          const table = document.createElement('table');
+          table.innerHTML = `
+            <thead>
+              <tr>
+                <th rowspan="2">年度 / 月份</th>
+                <th colspan="2">早班</th>
+                <th colspan="2">中班</th>
+                <th colspan="2">夜班</th>
+                <th colspan="2" class="total-col">月總計</th>
+              </tr>
+              <tr>
+                <th>場次</th><th>人數</th>
+                <th>場次</th><th>人數</th>
+                <th>場次</th><th>人數</th>
+                <th class="total-col">總場次</th><th class="total-col">總人數</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          `;
+          
+          const tbody = table.querySelector('tbody');
+          
+          // 將月份排序 (例如: 2023年 08月 -> 2023年 09月)
+          const sortedMonths = Object.keys(monthsData).sort((a, b) => a.localeCompare(b));
+          
+          let yearTotalSessions = 0;
+          let yearTotalPeople = 0;
+
+          sortedMonths.forEach(month => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${month}</td>`;
+            
+            let monthSessions = 0;
+            let monthPeople = 0;
+            
+            ['早班', '中班', '夜班'].forEach(shift => {
+              const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
+              tr.innerHTML += `<td>${stats.sessions}</td><td>${stats.people}</td>`;
+              
+              monthSessions += stats.sessions;
+              monthPeople += stats.people;
+            });
+            
+            // 月總計欄位
+            tr.innerHTML += `<td class="total-col">${monthSessions}</td><td class="total-col">${monthPeople}</td>`;
+            tbody.appendChild(tr);
+
+            yearTotalSessions += monthSessions;
+            yearTotalPeople += monthPeople;
+          });
+          
+          // 加入底部總計列
+          const footerTr = document.createElement('tr');
+          footerTr.innerHTML = `
+            <td style="font-weight: bold; background: #eef2f5;">總累計</td>
+            <td colspan="6" style="background: #eef2f5;"></td>
+            <td class="total-col">${yearTotalSessions}</td>
+            <td class="total-col">${yearTotalPeople}</td>
+          `;
+          tbody.appendChild(footerTr);
+          
+          card.appendChild(table);
+          contentDiv.appendChild(card);
+        }
+      })
+      .catch(error => {
+        document.getElementById('loading').textContent = '讀取失敗，請確認 Apps Script API 權限或網址是否正確。';
+        console.error('Error:', error);
+      });
+  </script>
+</body>
+</html>
