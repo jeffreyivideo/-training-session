@@ -54,71 +54,131 @@
     // ⚠️ 記得將下方換成您最新發佈的 GAS 網頁應用程式網址
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXg47GxjMju-NFoGnOp6CO5AyFZZ6PrqKMH2qBI3CncaFFoTISIPT3TBiQ-2h_CFIVJw/exec';
 
-    // 🌟 新增：課程名稱統一歸類函數 🌟
-    // 只要原始名稱包含特定「關鍵字」，就會被轉換成統一的標準名稱
-    // 🌟 加強版：課程名稱統一歸類函數 🌟
+    // 🌟 終極版：依照官方 SOP 分類表進行歸類與細項劃分 🌟
     function normalizeCourseName(rawName) {
-      if (!rawName) return "其他/未分類";
+      if (!rawName) return "其他作業 - 未分類";
       let n = rawName.toString().trim();
       
-      // 先轉為小寫並清除常見贅字，方便後續比對
+      // 去除常見贅字，方便精準比對
       n = n.replace(/(教育訓練|宣導|教學|注意事項|規範|員工|測驗|敎育訓練|作業流程|處理流程|通報流程)$/g, "");
       n = n.replace(/敎育訓練/g, "");
-      n = n.replace(/。/g, ""); // 去除句號
-      
-      // 1. 廁所與洗手間清潔 (綜合)
-      if (n.includes("洗手間") || n.includes("公廁旅客接觸點") || n.includes("廁所旅客接觸點") || n.includes("智慧廁") || n.includes("廁所清洗") || n.includes("廁所設施設備")) return "洗手間與廁所設施清潔 (綜合)";
-      
-      // 2. 馬桶與小便斗
-      if (n.includes("免治馬桶")) return "免治馬桶清潔與維護";
-      if (n.includes("馬桶") && n.includes("小便斗")) return "馬桶與小便斗清洗維護";
-      if (n.includes("馬桶")) return "馬桶清洗維護";
-      if (n.includes("小便斗")) return "小便斗清洗維護";
-      
-      // 3. 抹布與擦拭法
-      if (n.includes("抹布") || n.includes("八折法")) return "抹布分色與八折法使用";
-      
-      // 4. 清潔車與工具
-      if (n.includes("推車") || n.includes("潔具車")) return "工作推車整潔維護與擺放";
-      if (n.includes("耗材") || n.includes("垃圾袋") || n.includes("擦手紙") || n.includes("洗手乳")) return "廁所耗材更換與維護";
-      
-      // 5. 垃圾桶與垃圾場
-      if (n.includes("垃圾桶") || n.includes("煙灰桶") || n.includes("菸灰桶")) return "垃圾桶與煙灰桶清潔 (含緊急處理)";
-      if (n.includes("垃圾場") || n.includes("垃圾車") || n.includes("資源回收") || n.includes("廚餘") || n.includes("㕑餘")) return "垃圾場作業與資源回收分類";
-      
-      // 6. 突發狀況與污漬處理
-      if (n.includes("嘔吐物") || n.includes("飲料") || n.includes("液體灑落")) return "嘔吐物與飲料打翻處理";
-      if (n.includes("漏水") || n.includes("滴水") || n.includes("爆管")) return "漏水與滴水處理";
-      if (n.includes("跌倒") || n.includes("滑倒")) return "防滑與跌倒/滑倒危害告知";
-      
-      // 7. 緊急按鈕與通報 (電扶梯/走道)
-      if (n.includes("電扶梯") || n.includes("電走道") || n.includes("緊急鈴") || n.includes("緊急按鈕")) return "電扶梯與電走道緊急按鈕操作";
-      if (n.includes("警報按鈕") || n.includes("緊急求救鈴") || n.includes("復歸") || n.includes("賦歸")) return "警報按鈕解除與復歸";
-      if (n.includes("異常") || n.includes("通報") || n.includes("31999") || n.includes("OCC")) return "異常狀況與設施設備損壞通報";
-      
-      // 8. 旅客服務與遺失物
-      if (n.includes("禮儀") || n.includes("敲門") || n.includes("旅客中英文")) return "服務禮儀與應對技巧";
-      if (n.includes("遺失物") || n.includes("無主行李")) return "拾獲遺失物與無主行李處理";
-      if (n.includes("可疑")) return "發現可疑人事物處理";
-      
-      // 9. 公區與地面清潔
-      if (n.includes("公區清消") || n.includes("候機室") || n.includes("大廳")) return "公區與候機室清消作業";
-      if (n.includes("地面清洗") || n.includes("洗地") || n.includes("地面污垢")) return "地面清洗作業與安全防護";
-      if (n.includes("鏡面") || n.includes("洗手台") || n.includes("洗手檯") || n.includes("水漬")) return "洗手台與鏡面水漬清理";
-      
-      // 10. KPI 與防護
-      if (n.includes("KPI") || n.includes("6+1")) return "6+1項 KPI 清消作業";
-      if (n.includes("防護") || n.includes("隔離衣")) return "安全防護裝備穿脫";
-      if (n.includes("管制證") || n.includes("通行證") || n.includes("門禁") || n.includes("管制門")) return "門禁管制與通行證使用注意事項";
-      if (n.includes("噴霧機") || n.includes("吸塵器") || n.includes("打蠟機") || n.includes("洗地機")) return "電動清潔機具操作 (噴霧/吸塵/打蠟)";
-      
-      // 11. 工安與防災
-      if (n.includes("火災") || n.includes("火警") || n.includes("滅火器") || n.includes("行動電源")) return "火警應變與滅火器使用";
-      if (n.includes("地震")) return "地震緊急應變";
-      if (n.includes("墜落") || n.includes("滾落")) return "墜落與滾落危害告知";
-      if (n.includes("AED") || n.includes("CPR")) return "CPR 及 AED 訓練";
+      n = n.replace(/。/g, ""); 
+      n = n.toLowerCase();
 
-      return n.trim();
+      // ==========================================
+      // 【類別二】共同作業 (5項)
+      // ==========================================
+      if (n.includes("化學品") || n.includes("稀釋") || n.includes("立剋滅") || n.includes("清潔劑")) 
+        return "共同作業 - 危害性化學品分裝、稀釋作業";
+      if (n.includes("防護") || n.includes("隔離衣") || n.includes("口罩") || n.includes("手套")) 
+        return "共同作業 - 個人防護穿脫作業";
+      if (n.includes("火災") || n.includes("火警") || n.includes("滅火器") || n.includes("行動電源起火")) 
+        return "共同作業 - 火災緊急應變";
+      if (n.includes("地震")) 
+        return "共同作業 - 地震緊急應變";
+      if (n.includes("豪大雨") || n.includes("颱風")) 
+        return "共同作業 - 豪大雨緊急應變";
+
+      // ==========================================
+      // 【類別四】機械設備使用 (24項)
+      // ==========================================
+      if (n.includes("洗地車") || n.includes("駕駛式洗地")) return "機械設備使用 - 駕駛式洗地車";
+      if (n.includes("洗地機") || n.includes("打磨機") || n.includes("研磨機")) return "機械設備使用 - 打蠟機/石材晶化機";
+      if (n.includes("道路清掃車") || n.includes("掃街車")) return "機械設備使用 - 道路清掃車";
+      if (n.includes("地毯") && (n.includes("駕駛") || n.includes("清洗機"))) return "機械設備使用 - 駕駛式/一般地毯清洗機";
+      if (n.includes("吸塵器") && n.includes("背負式")) return "機械設備使用 - 背負式吸塵器";
+      if (n.includes("吸塵器") && n.includes("乾濕兩用")) return "機械設備使用 - 乾濕兩用吸塵器";
+      if (n.includes("吸塵器")) return "機械設備使用 - 乾式吸塵器";
+      if (n.includes("打蠟機") || n.includes("高速打蠟機")) return "機械設備使用 - 打蠟機";
+      if (n.includes("噴霧機") && n.includes("背負式")) return "機械設備使用 - 背負式噴霧機";
+      if (n.includes("噴霧機") || n.includes("電動噴霧機") || n.includes("手壓式噴霧器")) return "機械設備使用 - 各式噴霧器(手壓/電動)";
+      if (n.includes("次氯酸水") || n.includes("電解水")) return "機械設備使用 - 次氯酸水機";
+      if (n.includes("高空工作車") || n.includes("剪刀車")) return "機械設備使用 - 高空工作車操作";
+      if (n.includes("吊籠") || n.includes("洗窗")) return "機械設備使用 - 吊籠操作";
+      if (n.includes("升降平台") || n.includes("昇降平台")) return "機械設備使用 - 昇降平台操作";
+      if (n.includes("機器人") || n.includes("智能除菌")) return "機械設備使用 - 智能除菌/紫外線機器人";
+      if (n.includes("冷光儀") || n.includes("atp") || n.includes("測光儀")) return "機械設備使用 - ATP檢測儀/測光儀";
+
+      // ==========================================
+      // 【類別三】倉庫/駕駛/施設備使用
+      // ==========================================
+      if (n.includes("工作推車") || n.includes("潔具車")) return "施設備使用 - 工作推車使用";
+      if (n.includes("手推車") || n.includes("垃圾推車") || n.includes("大垃圾推車")) return "施設備使用 - 手推車/垃圾推車使用";
+      if (n.includes("a字梯") || n.includes("梯子")) return "施設備使用 - A字梯使用";
+      if (n.includes("公務車") || n.includes("巡檢車") || n.includes("駕駛")) return "駕駛作業 - 駕駛公務車/巡檢車";
+
+      // ==========================================
+      // 【類別一】一般清潔作業 (31項為主)
+      // ==========================================
+      if (n.includes("廁所") || n.includes("洗手間") || n.includes("馬桶") || n.includes("小便斗") || n.includes("kpi")) 
+        return "一般清潔作業 - 廁所清潔作業 (含KPI 6+1/耗材)";
+      if (n.includes("地面清洗") || n.includes("洗地")) 
+        return "一般清潔作業 - 地面清洗作業";
+      if (n.includes("戶外") || n.includes("人行道") || n.includes("停車場") || n.includes("騎樓")) 
+        return "一般清潔作業 - 戶外清潔作業";
+      if (n.includes("行李處理場") || n.includes("機坪")) 
+        return "一般清潔作業 - 行李處理場、機坪作業";
+      if (n.includes("垃圾") || n.includes("資源回收") || n.includes("廚餘")) 
+        return "一般清潔作業 - 垃圾收集暨清潔作業";
+      if (n.includes("候機室")) 
+        return "一般清潔作業 - 候機室設施設備清潔";
+      if (n.includes("哺乳室")) 
+        return "一般清潔作業 - 哺乳室設施設備清潔";
+      if (n.includes("茶水間") || n.includes("飲水機")) 
+        return "一般清潔作業 - 茶水間/飲水機清潔作業";
+      if (n.includes("大廳") || n.includes("長廊") || n.includes("公區清消")) 
+        return "一般清潔作業 - 大廳/長廊清潔作業";
+      if (n.includes("環境除臭") || n.includes("消毒") || n.includes("清消") || n.includes("接觸點")) 
+        return "一般清潔作業 - 環境除臭及消毒作業";
+      if (n.includes("塑膠") || n.includes("大理石") || n.includes("花崗石") || n.includes("晶化")) 
+        return "一般清潔作業 - 洗地、打蠟及晶化作業";
+      if (n.includes("不鏽鋼") || n.includes("不銹鋼") || n.includes("除鏽")) 
+        return "一般清潔作業 - 不鏽鋼清潔作業";
+      if (n.includes("煙灰桶") || n.includes("菸灰桶")) 
+        return "一般清潔作業 - 煙灰桶清潔作業";
+      if (n.includes("樓梯") || n.includes("電扶梯周邊") || n.includes("扶手")) 
+        return "一般清潔作業 - 樓梯清潔作業";
+      if (n.includes("除塵") || n.includes("蜘蛛網") || n.includes("窗戶走廊") || n.includes("天花板牆柱")) 
+        return "一般清潔作業 - 除塵清潔作業";
+      if (n.includes("玻璃") || n.includes("鏡面")) 
+        return "一般清潔作業 - 玻璃與鏡面清潔作業";
+      if (n.includes("嘔吐物") || n.includes("液體灑落")) 
+        return "一般清潔作業 - 嘔吐物處理作業";
+      if (n.includes("飲料打翻") || n.includes("飲料傾倒")) 
+        return "一般清潔作業 - 飲料傾倒清潔作業";
+      if (n.includes("漏水") || n.includes("滴水") || n.includes("爆管")) 
+        return "一般清潔作業 - 天花板漏水處理作業";
+      if (n.includes("通報") || n.includes("異常") || n.includes("損壞") || n.includes("31999") || n.includes("occ")) 
+        return "一般清潔作業 - 設施設備損壞/異常通報作業";
+      if (n.includes("跌倒") || n.includes("滑倒") || n.includes("暈倒")) 
+        return "一般清潔作業 - 旅客跌倒回報處置作業";
+      if (n.includes("遺失物") || n.includes("無主行李")) 
+        return "一般清潔作業 - 拾獲遺失物處理作業";
+      if (n.includes("顏色區分") || n.includes("分色")) 
+        return "一般清潔作業 - 抹布及平板布顏色區分";
+      if (n.includes("抹布") || n.includes("八折法")) 
+        return "一般清潔作業 - 抹布八折法";
+      if (n.includes("雨傘套")) 
+        return "一般清潔作業 - 雨傘套組裝作業";
+      if (n.includes("緊急按鈕解除") || n.includes("復歸") || n.includes("緊急求救鈴") || n.includes("電扶梯") || n.includes("電走道")) 
+        return "一般清潔作業 - 緊急按鈕解除作業";
+
+      // ==========================================
+      // 【其他】SOP 表以外，但機場常見的必備訓練
+      // ==========================================
+      if (n.includes("禮儀") || n.includes("應對") || n.includes("旅客諮詢") || n.includes("中英文")) 
+        return "其他作業 - 服務禮儀與旅客應對";
+      if (n.includes("可疑") || n.includes("危安") || n.includes("反恐")) 
+        return "其他作業 - 發現可疑人事物處置";
+      if (n.includes("管制證") || n.includes("通行證") || n.includes("門禁")) 
+        return "其他作業 - 管制區通行與門禁規範";
+      if (n.includes("墜落") || n.includes("滾落")) 
+        return "其他作業 - 墜落/滾落危害告知";
+      if (n.includes("cpr") || n.includes("aed") || n.includes("急救")) 
+        return "其他作業 - CPR與AED急救訓練";
+
+      // 如果真的都沒命中，就保留原始名稱，但加上「未分類」前綴
+      return "其他作業 - " + n.trim();
     }
 
     // 負責產生月統計表格 HTML 的函數
