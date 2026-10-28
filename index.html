@@ -8,13 +8,8 @@
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; color: #333; }
     h1 { text-align: center; color: #2c3e50; font-weight: bold; margin-bottom: 30px; }
     
-    /* 頁籤設計 */
     .tab-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 25px; justify-content: center; }
-    .tab-btn { 
-      padding: 10px 25px; cursor: pointer; border: 2px solid #0056b3; 
-      background: #fff; color: #0056b3; border-radius: 8px; 
-      font-size: 16px; font-weight: bold; transition: all 0.2s ease-in-out; 
-    }
+    .tab-btn { padding: 10px 25px; cursor: pointer; border: 2px solid #0056b3; background: #fff; color: #0056b3; border-radius: 8px; font-size: 16px; font-weight: bold; transition: all 0.2s; }
     .tab-btn:hover { background: #e6f0fa; transform: translateY(-2px); }
     .tab-btn.active { background: #0056b3; color: white; box-shadow: 0 4px 10px rgba(0,86,179,0.3); }
     
@@ -23,9 +18,8 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
     .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-    .card-total { border-top: 5px solid #28a745; } /* 總計卡片加上綠邊 */
-    .card-course { border-top: 5px solid #ffc107; } /* 課程卡片加上黃邊 */
-    
+    .card-total { border-top: 5px solid #28a745; }
+    .card-course { border-top: 5px solid #ffc107; }
     h2 { color: #0056b3; border-left: 4px solid #0056b3; padding-left: 10px; margin-top: 0; }
     .title-total { color: #28a745; border-color: #28a745; }
     .title-course { color: #d39e00; border-color: #ffc107; }
@@ -35,12 +29,24 @@
     th { background-color: #f8f9fa; color: #495057; font-weight: 600; }
     .total-col { background-color: #eef2f5; font-weight: bold; color: #0056b3; }
     
-    /* 課程排行表特殊樣式 */
     .course-table th { background-color: #fff8e1; }
-    .course-table tr:hover { background-color: #fdfbf5; }
+    .course-table tr.clickable { cursor: pointer; transition: background 0.2s; }
+    .course-table tr.clickable:hover { background-color: #ffefc4; }
     .rank-num { font-weight: bold; color: #666; }
+    .click-hint { font-size: 0.8em; color: #888; font-weight: normal; margin-left: 10px; }
 
     .loading { text-align: center; padding: 40px; font-size: 1.2em; color: #666; }
+
+    /* 彈出視窗 (Modal) 樣式 */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
+    .modal-content { background: #fff; width: 90%; max-width: 600px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; }
+    .modal-header { background: #0056b3; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { margin: 0; font-size: 18px; }
+    .close-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; line-height: 1; }
+    .close-btn:hover { color: #ffcccc; }
+    .modal-body { padding: 20px; overflow-y: auto; }
+    .detail-table th { background: #eef2f5; position: sticky; top: 0; }
   </style>
 </head>
 <body>
@@ -50,38 +56,38 @@
     <div id="content"></div>
   </div>
 
+  <!-- 彈出視窗 (用來顯示明細) -->
+  <div class="modal-overlay" id="courseModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalCourseTitle">課程明細</h3>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <table class="detail-table" id="modalTable">
+          <thead>
+            <tr><th>航廈</th><th>日期</th><th>班別</th><th>受訓人數</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ⚠️ 記得將下方換成您最新發佈的 GAS 網頁應用程式網址
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXg47GxjMju-NFoGnOp6CO5AyFZZ6PrqKMH2qBI3CncaFFoTISIPT3TBiQ-2h_CFIVJw/exec';
 
-    // 🌟 終極版：依照官方 SOP 分類表進行歸類與細項劃分 🌟
+    // 🌟 SOP 歸類函數保留 🌟
     function normalizeCourseName(rawName) {
       if (!rawName) return "其他作業 - 未分類";
-      let n = rawName.toString().trim();
-      
-      // 去除常見贅字，方便精準比對
-      n = n.replace(/(教育訓練|宣導|教學|注意事項|規範|員工|測驗|敎育訓練|作業流程|處理流程|通報流程)$/g, "");
-      n = n.replace(/敎育訓練/g, "");
-      n = n.replace(/。/g, ""); 
-      n = n.toLowerCase();
+      let n = rawName.toString().trim().replace(/(教育訓練|宣導|教學|注意事項|規範|員工|測驗|敎育訓練|作業流程|處理流程|通報流程)$/g, "").replace(/敎育訓練/g, "").replace(/。/g, "").toLowerCase();
 
-      // ==========================================
-      // 【類別二】共同作業 (5項)
-      // ==========================================
-      if (n.includes("化學品") || n.includes("稀釋") || n.includes("立剋滅") || n.includes("清潔劑")) 
-        return "共同作業 - 危害性化學品分裝、稀釋作業";
-      if (n.includes("防護") || n.includes("隔離衣") || n.includes("口罩") || n.includes("手套")) 
-        return "共同作業 - 個人防護穿脫作業";
-      if (n.includes("火災") || n.includes("火警") || n.includes("滅火器") || n.includes("行動電源起火")) 
-        return "共同作業 - 火災緊急應變";
-      if (n.includes("地震")) 
-        return "共同作業 - 地震緊急應變";
-      if (n.includes("豪大雨") || n.includes("颱風")) 
-        return "共同作業 - 豪大雨緊急應變";
-
-      // ==========================================
-      // 【類別四】機械設備使用 (24項)
-      // ==========================================
+      if (n.includes("化學品") || n.includes("稀釋") || n.includes("立剋滅") || n.includes("清潔劑")) return "共同作業 - 危害性化學品分裝、稀釋作業";
+      if (n.includes("防護") || n.includes("隔離衣") || n.includes("口罩") || n.includes("手套")) return "共同作業 - 個人防護穿脫作業";
+      if (n.includes("火災") || n.includes("火警") || n.includes("滅火器") || n.includes("行動電源起火")) return "共同作業 - 火災緊急應變";
+      if (n.includes("地震")) return "共同作業 - 地震緊急應變";
+      if (n.includes("豪大雨") || n.includes("颱風")) return "共同作業 - 豪大雨緊急應變";
       if (n.includes("洗地車") || n.includes("駕駛式洗地")) return "機械設備使用 - 駕駛式洗地車";
       if (n.includes("洗地機") || n.includes("打磨機") || n.includes("研磨機")) return "機械設備使用 - 打蠟機/石材晶化機";
       if (n.includes("道路清掃車") || n.includes("掃街車")) return "機械設備使用 - 道路清掃車";
@@ -98,162 +104,130 @@
       if (n.includes("升降平台") || n.includes("昇降平台")) return "機械設備使用 - 昇降平台操作";
       if (n.includes("機器人") || n.includes("智能除菌")) return "機械設備使用 - 智能除菌/紫外線機器人";
       if (n.includes("冷光儀") || n.includes("atp") || n.includes("測光儀")) return "機械設備使用 - ATP檢測儀/測光儀";
-
-      // ==========================================
-      // 【類別三】倉庫/駕駛/施設備使用
-      // ==========================================
       if (n.includes("工作推車") || n.includes("潔具車")) return "施設備使用 - 工作推車使用";
       if (n.includes("手推車") || n.includes("垃圾推車") || n.includes("大垃圾推車")) return "施設備使用 - 手推車/垃圾推車使用";
       if (n.includes("a字梯") || n.includes("梯子")) return "施設備使用 - A字梯使用";
       if (n.includes("公務車") || n.includes("巡檢車") || n.includes("駕駛")) return "駕駛作業 - 駕駛公務車/巡檢車";
-
-      // ==========================================
-      // 【類別一】一般清潔作業 (31項為主)
-      // ==========================================
-      if (n.includes("廁所") || n.includes("洗手間") || n.includes("馬桶") || n.includes("小便斗") || n.includes("kpi")) 
-        return "一般清潔作業 - 廁所清潔作業 (含KPI 6+1/耗材)";
-      if (n.includes("地面清洗") || n.includes("洗地")) 
-        return "一般清潔作業 - 地面清洗作業";
-      if (n.includes("戶外") || n.includes("人行道") || n.includes("停車場") || n.includes("騎樓")) 
-        return "一般清潔作業 - 戶外清潔作業";
-      if (n.includes("行李處理場") || n.includes("機坪")) 
-        return "一般清潔作業 - 行李處理場、機坪作業";
-      if (n.includes("垃圾") || n.includes("資源回收") || n.includes("廚餘")) 
-        return "一般清潔作業 - 垃圾收集暨清潔作業";
-      if (n.includes("候機室")) 
-        return "一般清潔作業 - 候機室設施設備清潔";
-      if (n.includes("哺乳室")) 
-        return "一般清潔作業 - 哺乳室設施設備清潔";
-      if (n.includes("茶水間") || n.includes("飲水機")) 
-        return "一般清潔作業 - 茶水間/飲水機清潔作業";
-      if (n.includes("大廳") || n.includes("長廊") || n.includes("公區清消")) 
-        return "一般清潔作業 - 大廳/長廊清潔作業";
-      if (n.includes("環境除臭") || n.includes("消毒") || n.includes("清消") || n.includes("接觸點")) 
-        return "一般清潔作業 - 環境除臭及消毒作業";
-      if (n.includes("塑膠") || n.includes("大理石") || n.includes("花崗石") || n.includes("晶化")) 
-        return "一般清潔作業 - 洗地、打蠟及晶化作業";
-      if (n.includes("不鏽鋼") || n.includes("不銹鋼") || n.includes("除鏽")) 
-        return "一般清潔作業 - 不鏽鋼清潔作業";
-      if (n.includes("煙灰桶") || n.includes("菸灰桶")) 
-        return "一般清潔作業 - 煙灰桶清潔作業";
-      if (n.includes("樓梯") || n.includes("電扶梯周邊") || n.includes("扶手")) 
-        return "一般清潔作業 - 樓梯清潔作業";
-      if (n.includes("除塵") || n.includes("蜘蛛網") || n.includes("窗戶走廊") || n.includes("天花板牆柱")) 
-        return "一般清潔作業 - 除塵清潔作業";
-      if (n.includes("玻璃") || n.includes("鏡面")) 
-        return "一般清潔作業 - 玻璃與鏡面清潔作業";
-      if (n.includes("嘔吐物") || n.includes("液體灑落")) 
-        return "一般清潔作業 - 嘔吐物處理作業";
-      if (n.includes("飲料打翻") || n.includes("飲料傾倒")) 
-        return "一般清潔作業 - 飲料傾倒清潔作業";
-      if (n.includes("漏水") || n.includes("滴水") || n.includes("爆管")) 
-        return "一般清潔作業 - 天花板漏水處理作業";
-      if (n.includes("通報") || n.includes("異常") || n.includes("損壞") || n.includes("31999") || n.includes("occ")) 
-        return "一般清潔作業 - 設施設備損壞/異常通報作業";
-      if (n.includes("跌倒") || n.includes("滑倒") || n.includes("暈倒")) 
-        return "一般清潔作業 - 旅客跌倒回報處置作業";
-      if (n.includes("遺失物") || n.includes("無主行李")) 
-        return "一般清潔作業 - 拾獲遺失物處理作業";
-      if (n.includes("顏色區分") || n.includes("分色")) 
-        return "一般清潔作業 - 抹布及平板布顏色區分";
-      if (n.includes("抹布") || n.includes("八折法")) 
-        return "一般清潔作業 - 抹布八折法";
-      if (n.includes("雨傘套")) 
-        return "一般清潔作業 - 雨傘套組裝作業";
-      if (n.includes("緊急按鈕解除") || n.includes("復歸") || n.includes("緊急求救鈴") || n.includes("電扶梯") || n.includes("電走道")) 
-        return "一般清潔作業 - 緊急按鈕解除作業";
-
-      // ==========================================
-      // 【其他】SOP 表以外，但機場常見的必備訓練
-      // ==========================================
-      if (n.includes("禮儀") || n.includes("應對") || n.includes("旅客諮詢") || n.includes("中英文")) 
-        return "其他作業 - 服務禮儀與旅客應對";
-      if (n.includes("可疑") || n.includes("危安") || n.includes("反恐")) 
-        return "其他作業 - 發現可疑人事物處置";
-      if (n.includes("管制證") || n.includes("通行證") || n.includes("門禁")) 
-        return "其他作業 - 管制區通行與門禁規範";
-      if (n.includes("墜落") || n.includes("滾落")) 
-        return "其他作業 - 墜落/滾落危害告知";
-      if (n.includes("cpr") || n.includes("aed") || n.includes("急救")) 
-        return "其他作業 - CPR與AED急救訓練";
-
-      // 如果真的都沒命中，就保留原始名稱，但加上「未分類」前綴
-      return "其他作業 - " + n.trim();
+      if (n.includes("廁所") || n.includes("洗手間") || n.includes("馬桶") || n.includes("小便斗") || n.includes("kpi")) return "一般清潔作業 - 廁所清潔作業 (含KPI 6+1/耗材)";
+      if (n.includes("地面清洗") || n.includes("洗地")) return "一般清潔作業 - 地面清洗作業";
+      if (n.includes("戶外") || n.includes("人行道") || n.includes("停車場") || n.includes("騎樓")) return "一般清潔作業 - 戶外清潔作業";
+      if (n.includes("行李處理場") || n.includes("機坪")) return "一般清潔作業 - 行李處理場、機坪作業";
+      if (n.includes("垃圾") || n.includes("資源回收") || n.includes("廚餘")) return "一般清潔作業 - 垃圾收集暨清潔作業";
+      if (n.includes("候機室")) return "一般清潔作業 - 候機室設施設備清潔";
+      if (n.includes("哺乳室")) return "一般清潔作業 - 哺乳室設施設備清潔";
+      if (n.includes("茶水間") || n.includes("飲水機")) return "一般清潔作業 - 茶水間/飲水機清潔作業";
+      if (n.includes("大廳") || n.includes("長廊") || n.includes("公區清消")) return "一般清潔作業 - 大廳/長廊清潔作業";
+      if (n.includes("環境除臭") || n.includes("消毒") || n.includes("清消") || n.includes("接觸點")) return "一般清潔作業 - 環境除臭及消毒作業";
+      if (n.includes("塑膠") || n.includes("大理石") || n.includes("花崗石") || n.includes("晶化")) return "一般清潔作業 - 洗地、打蠟及晶化作業";
+      if (n.includes("不鏽鋼") || n.includes("不銹鋼") || n.includes("除鏽")) return "一般清潔作業 - 不鏽鋼清潔作業";
+      if (n.includes("煙灰桶") || n.includes("菸灰桶")) return "一般清潔作業 - 煙灰桶清潔作業";
+      if (n.includes("樓梯") || n.includes("電扶梯周邊") || n.includes("扶手")) return "一般清潔作業 - 樓梯清潔作業";
+      if (n.includes("除塵") || n.includes("蜘蛛網") || n.includes("窗戶走廊") || n.includes("天花板牆柱")) return "一般清潔作業 - 除塵清潔作業";
+      if (n.includes("玻璃") || n.includes("鏡面")) return "一般清潔作業 - 玻璃與鏡面清潔作業";
+      if (n.includes("嘔吐物") || n.includes("液體灑落")) return "一般清潔作業 - 嘔吐物處理作業";
+      if (n.includes("飲料打翻") || n.includes("飲料傾倒")) return "一般清潔作業 - 飲料傾倒清潔作業";
+      if (n.includes("漏水") || n.includes("滴水") || n.includes("爆管")) return "一般清潔作業 - 天花板漏水處理作業";
+      if (n.includes("通報") || n.includes("異常") || n.includes("損壞") || n.includes("31999") || n.includes("occ")) return "一般清潔作業 - 設施設備損壞/異常通報作業";
+      if (n.includes("跌倒") || n.includes("滑倒") || n.includes("暈倒")) return "一般清潔作業 - 旅客跌倒回報處置作業";
+      if (n.includes("遺失物") || n.includes("無主行李")) return "一般清潔作業 - 拾獲遺失物處理作業";
+      if (n.includes("顏色區分") || n.includes("分色")) return "一般清潔作業 - 抹布及平板布顏色區分";
+      if (n.includes("抹布") || n.includes("八折法")) return "一般清潔作業 - 抹布八折法";
+      if (n.includes("雨傘套")) return "一般清潔作業 - 雨傘套組裝作業";
+      if (n.includes("緊急按鈕解除") || n.includes("復歸") || n.includes("緊急求救鈴") || n.includes("電扶梯") || n.includes("電走道")) return "一般清潔作業 - 緊急按鈕解除作業";
+      if (n.includes("禮儀") || n.includes("應對") || n.includes("旅客諮詢") || n.includes("中英文")) return "其他作業 - 服務禮儀與旅客應對";
+      if (n.includes("可疑") || n.includes("危安") || n.includes("反恐")) return "其他作業 - 發現可疑人事物處置";
+      if (n.includes("管制證") || n.includes("通行證") || n.includes("門禁")) return "其他作業 - 管制區通行與門禁規範";
+      if (n.includes("墜落") || n.includes("滾落")) return "其他作業 - 墜落/滾落危害告知";
+      if (n.includes("cpr") || n.includes("aed") || n.includes("急救")) return "其他作業 - CPR與AED急救訓練";
+      return "其他作業 - " + rawName.toString().trim();
     }
 
-    // 負責產生月統計表格 HTML 的函數
+    // 顯示 Modal 明細
+    function showCourseDetails(courseName, detailsArray) {
+      document.getElementById('modalCourseTitle').textContent = courseName;
+      const tbody = document.querySelector('#modalTable tbody');
+      tbody.innerHTML = '';
+      
+      if(detailsArray && detailsArray.length > 0) {
+        // 依照航廈與日期稍微排序
+        detailsArray.sort((a, b) => a.terminal.localeCompare(b.terminal) || a.date.localeCompare(b.date));
+        
+        detailsArray.forEach(detail => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${detail.terminal}</td>
+            <td>${detail.date}</td>
+            <td>${detail.shift}</td>
+            <td>${detail.people} 人</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4">無詳細資料</td></tr>';
+      }
+      document.getElementById('courseModal').classList.add('active');
+    }
+
+    // 關閉 Modal
+    function closeModal() {
+      document.getElementById('courseModal').classList.remove('active');
+    }
+    // 點擊背景關閉
+    window.onclick = function(event) {
+      const modal = document.getElementById('courseModal');
+      if (event.target === modal) closeModal();
+    }
+
+    // 產生月報表卡片
     function createStatsTable(monthsData, title, titleClass = "", cardClass = "") {
       const card = document.createElement('div');
       card.className = `card ${cardClass}`;
       card.innerHTML = `<h2 class="${titleClass}">${title}</h2>`;
-      
       const table = document.createElement('table');
       table.innerHTML = `
         <thead>
-          <tr>
-            <th rowspan="2">月份</th>
-            <th colspan="2">早班</th>
-            <th colspan="2">中班</th>
-            <th colspan="2">夜班</th>
-            <th colspan="2" class="total-col">月總計</th>
-          </tr>
-          <tr>
-            <th>場次</th><th>人數</th>
-            <th>場次</th><th>人數</th>
-            <th>場次</th><th>人數</th>
-            <th class="total-col">總場次</th><th class="total-col">總人數</th>
-          </tr>
+          <tr><th rowspan="2">月份</th><th colspan="2">早班</th><th colspan="2">中班</th><th colspan="2">夜班</th><th colspan="2" class="total-col">月總計</th></tr>
+          <tr><th>場次</th><th>人數</th><th>場次</th><th>人數</th><th>場次</th><th>人數</th><th class="total-col">總場次</th><th class="total-col">總人數</th></tr>
         </thead>
         <tbody></tbody>
       `;
-      
       const tbody = table.querySelector('tbody');
       const sortedMonths = Object.keys(monthsData).sort();
       let yearTotalSessions = 0, yearTotalPeople = 0;
-
       sortedMonths.forEach(month => {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${month}</td>`;
         let monthSessions = 0, monthPeople = 0;
-        
         ['早班', '中班', '夜班'].forEach(shift => {
           const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
           tr.innerHTML += `<td>${stats.sessions}</td><td>${stats.people}</td>`;
           monthSessions += stats.sessions;
           monthPeople += stats.people;
         });
-        
         tr.innerHTML += `<td class="total-col">${monthSessions}</td><td class="total-col">${monthPeople}</td>`;
         tbody.appendChild(tr);
         yearTotalSessions += monthSessions;
         yearTotalPeople += monthPeople;
       });
-      
       const footerTr = document.createElement('tr');
-      footerTr.innerHTML = `
-        <td style="font-weight: bold; background: #eef2f5;">年度累計</td>
-        <td colspan="6" style="background: #eef2f5;"></td>
-        <td class="total-col" style="font-size:1.1em;">${yearTotalSessions}</td>
-        <td class="total-col" style="font-size:1.1em;">${yearTotalPeople}</td>
-      `;
+      footerTr.innerHTML = `<td style="font-weight: bold; background: #eef2f5;">年度累計</td><td colspan="6" style="background: #eef2f5;"></td><td class="total-col" style="font-size:1.1em;">${yearTotalSessions}</td><td class="total-col" style="font-size:1.1em;">${yearTotalPeople}</td>`;
       tbody.appendChild(footerTr);
       card.appendChild(table);
       return card;
     }
 
+    // 主程式開始
     fetch(GAS_URL)
       .then(response => response.json())
       .then(data => {
         document.getElementById('loading').style.display = 'none';
         const contentDiv = document.getElementById('content');
-        
         const tabsContainer = document.createElement('div');
         tabsContainer.className = 'tab-container';
         contentDiv.appendChild(tabsContainer);
-
         const sectionsContainer = document.createElement('div');
         contentDiv.appendChild(sectionsContainer);
-
+        
         const sortedYears = Object.keys(data).sort();
         let isFirst = true;
 
@@ -277,13 +251,10 @@
           const yearCourses = data[year].courses;
           const terminals = Object.keys(yearStats).sort();
 
-          // 1. 全區加總月報表
           const combinedStats = {};
           terminals.forEach(terminal => {
             for (const [month, shiftData] of Object.entries(yearStats[terminal])) {
-              if (!combinedStats[month]) {
-                combinedStats[month] = { '早班': {sessions:0, people:0}, '中班': {sessions:0, people:0}, '夜班': {sessions:0, people:0} };
-              }
+              if (!combinedStats[month]) combinedStats[month] = { '早班': {sessions:0, people:0}, '中班': {sessions:0, people:0}, '夜班': {sessions:0, people:0} };
               ['早班', '中班', '夜班'].forEach(shift => {
                 combinedStats[month][shift].sessions += (shiftData[shift]?.sessions || 0);
                 combinedStats[month][shift].people += (shiftData[shift]?.people || 0);
@@ -294,62 +265,55 @@
             yearSection.appendChild(createStatsTable(combinedStats, "全區加總 (一航 ＋ 二航)", "title-total", "card-total"));
           }
 
-          // 2. 各航廈月報表
           terminals.forEach(terminal => {
             yearSection.appendChild(createStatsTable(yearStats[terminal], terminal));
           });
 
-          // 3. 🌟 課程排名 (導入歸類邏輯) 🌟
+          // 處理課程排行與明細收集
           const combinedCourses = {};
           terminals.forEach(terminal => {
             if (yearCourses[terminal]) {
               for (const [rawCourseName, courseStats] of Object.entries(yearCourses[terminal])) {
-                // 將原始名稱丟入我們寫好的函數進行清理與歸類
                 const cleanCourseName = normalizeCourseName(rawCourseName);
-                
                 if (!combinedCourses[cleanCourseName]) {
-                  combinedCourses[cleanCourseName] = { sessions: 0, people: 0 };
+                  combinedCourses[cleanCourseName] = { sessions: 0, people: 0, details: [] };
                 }
-                // 將場次與人數合併到「清理後的名稱」底下
                 combinedCourses[cleanCourseName].sessions += courseStats.sessions;
                 combinedCourses[cleanCourseName].people += courseStats.people;
+                // 將後端傳來的明細陣列合併進去
+                if (courseStats.details) {
+                  combinedCourses[cleanCourseName].details.push(...courseStats.details);
+                }
               }
             }
           });
 
           const sortedCourses = Object.keys(combinedCourses).sort((a, b) => {
-            if (combinedCourses[b].sessions !== combinedCourses[a].sessions) {
-              return combinedCourses[b].sessions - combinedCourses[a].sessions;
-            }
+            if (combinedCourses[b].sessions !== combinedCourses[a].sessions) return combinedCourses[b].sessions - combinedCourses[a].sessions;
             return combinedCourses[b].people - combinedCourses[a].people;
           });
 
           if (sortedCourses.length > 0) {
             const courseCard = document.createElement('div');
             courseCard.className = 'card card-course';
-            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (全區歸類後)</h2>`;
+            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (全區歸類後) <span class="click-hint">※ 點擊表格列可查看上課日期與明細</span></h2>`;
             
             const courseTable = document.createElement('table');
             courseTable.className = 'course-table';
-            courseTable.innerHTML = `
-              <thead>
-                <tr>
-                  <th width="10%">排名</th>
-                  <th width="50%" style="text-align: left;">訓練課程名稱</th>
-                  <th width="20%">累計場次</th>
-                  <th width="20%">受訓總人數</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            `;
+            courseTable.innerHTML = `<thead><tr><th width="10%">排名</th><th width="50%" style="text-align: left;">訓練課程名稱 (依SOP歸類)</th><th width="20%">累計場次</th><th width="20%">受訓總人數</th></tr></thead><tbody></tbody>`;
             
             const cTbody = courseTable.querySelector('tbody');
             sortedCourses.forEach((cName, index) => {
               const stats = combinedCourses[cName];
               const tr = document.createElement('tr');
+              tr.className = 'clickable'; // 加上可點擊的 class
+              tr.title = "點擊查看各航廈日期明細";
+              // 綁定點擊事件，觸發 Modal
+              tr.onclick = () => showCourseDetails(cName, stats.details);
+              
               tr.innerHTML = `
                 <td class="rank-num">${index + 1}</td>
-                <td style="text-align: left; font-weight: 500;">${cName}</td>
+                <td style="text-align: left; font-weight: 500; color: #0056b3;">${cName}</td>
                 <td>${stats.sessions}</td>
                 <td>${stats.people}</td>
               `;
@@ -358,7 +322,6 @@
             courseCard.appendChild(courseTable);
             yearSection.appendChild(courseCard);
           }
-
           sectionsContainer.appendChild(yearSection);
           isFirst = false;
         });
