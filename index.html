@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>航廈教育訓練統計儀表板</title>
+  <!-- 引入 Chart.js 繪圖套件 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <style>
     :root {
       --primary-color: #0056b3;
@@ -37,17 +40,19 @@
     .card-total { border-top: 6px solid var(--secondary-color); }
     .card-terminal { border-top: 6px solid var(--primary-color); }
     .card-course { border-top: 6px solid #ffc107; }
+    .card-chart { border-top: 6px solid #17a2b8; }
     
     h2 { color: var(--primary-color); border-left: 5px solid var(--primary-color); padding-left: 12px; margin-top: 0; font-size: 1.4em; }
     .title-total { color: var(--secondary-color); border-color: var(--secondary-color); }
     .title-course { color: var(--accent-color); border-color: #ffc107; }
+    .title-chart { color: #17a2b8; border-color: #17a2b8; }
 
     /* 表格設計 */
     table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; font-size: 15px; }
     th, td { border: 1px solid var(--table-border); padding: 12px; text-align: center; vertical-align: middle; }
     th { background-color: var(--table-header); color: #495057; font-weight: 600; }
     .total-col { background-color: #eef2f5; font-weight: bold; color: var(--primary-color); }
-    .highlight-num { color: #d9534f; font-weight: bold; } /* 人數大於0時高亮 */
+    .highlight-num { color: #d9534f; font-weight: bold; font-size: 1.1em; } 
 
     /* 排行榜表格 */
     .course-table th { background-color: #fff8e1; color: #856404; }
@@ -63,19 +68,37 @@
     /* Modal 彈出視窗優化 */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
     .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
-    .modal-content { background: #f8f9fa; width: 95%; max-width: 1000px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; }
+    .modal-content { background: #f8f9fa; width: 95%; max-width: 1100px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; }
     .modal-header { background: var(--primary-color); color: white; padding: 18px 25px; display: flex; justify-content: space-between; align-items: center; }
     .modal-header h3 { margin: 0; font-size: 20px; font-weight: 600; }
     .close-btn { background: none; border: none; color: white; font-size: 28px; cursor: pointer; line-height: 1; transition: color 0.2s; }
     .close-btn:hover { color: #ffcccc; transform: scale(1.1); }
     .modal-body { padding: 25px; overflow-y: auto; }
     
-    /* Modal 內的卡片 */
+    /* Modal 內的卡片與日期清單標籤 */
     .modal-card { background: #fff; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid var(--primary-color); }
     .modal-card h4 { margin: 0 0 15px 0; color: var(--primary-color); font-size: 1.1em; }
     .modal-table th { background: #eef2f5; font-size: 14px; padding: 8px; }
     .modal-table td { font-size: 14px; padding: 8px; }
     .modal-empty { text-align: center; color: #6c757d; padding: 20px; }
+    
+    /* 課程明細的日期標籤 */
+    .modal-dates {
+      font-size: 0.75em;
+      color: #555;
+      background-color: #f1f3f5;
+      border-radius: 4px;
+      padding: 3px 6px;
+      margin-top: 6px;
+      display: inline-block;
+      line-height: 1.4;
+      max-width: 120px;
+      word-wrap: break-word;
+      border: 1px solid #e9ecef;
+    }
+    
+    /* 圖表容器 */
+    .chart-container { position: relative; width: 100%; height: 350px; margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -83,7 +106,7 @@
   <div id="app">
     <div class="loading" id="loading">
       <div class="loader-spinner"></div>
-      <div>正在連線至資料庫讀取最新數據...</div>
+      <div>正在連線至資料庫讀取最新數據，並繪製圖表中...</div>
     </div>
     <div id="content"></div>
   </div>
@@ -95,9 +118,7 @@
         <h3 id="modalCourseTitle">課程名稱</h3>
         <button class="close-btn" onclick="closeModal()">&times;</button>
       </div>
-      <div class="modal-body" id="modalBody">
-        <!-- JS 將會在這裡動態生成一航與二航的統計表格 -->
-      </div>
+      <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
 
@@ -169,12 +190,16 @@
       return "其他作業 - " + rawName.toString().trim();
     }
 
-    // 格式化數字 (0 不顯示高亮)
-    function formatNum(num) {
-      return num > 0 ? `<span class="highlight-num">${num}</span>` : "0";
+    // Modal 專用：格式化儲存格，包含場次、高亮，以及「確切日期標籤」
+    function formatCellWithDates(count, datesArray) {
+      if (count === 0) return "0";
+      // 過濾並取得不重複的日期
+      const uniqueDates = [...new Set(datesArray)].sort();
+      const dateHtml = uniqueDates.length > 0 ? `<br><div class="modal-dates">${uniqueDates.join(', ')}</div>` : '';
+      return `<span class="highlight-num">${count}</span>${dateHtml}`;
     }
 
-    // 🌟 Modal 核心：將明細陣列轉換為「分航廈、分月份、分班別」的統計表
+    // 顯示 Modal 明細 (支援日期顯示)
     function showCourseDetails(courseName, detailsArray) {
       document.getElementById('modalCourseTitle').textContent = `📄 ${courseName} - 詳細統計`;
       const modalBody = document.getElementById('modalBody');
@@ -186,33 +211,35 @@
         return;
       }
 
-      // 1. 將凌亂的明細重新依照 航廈 -> 月份 -> 班別 進行分類加總
+      // 重新依 航廈 -> 月份 -> 班別 分類，並紀錄 dates
       const analyzedData = {};
       
       detailsArray.forEach(detail => {
-        const terminal = detail.terminal; // "一航" 或 "二航"
-        const shift = detail.shift;       // "早班", "中班", "夜班"
+        const terminal = detail.terminal;
+        const shift = detail.shift;
         const people = parseInt(detail.people) || 0;
         
-        // 從 "MM/dd" 提取出月份 "MM月"
         let monthStr = "未知月";
         if (detail.date && detail.date.includes('/')) {
-           const monthNum = detail.date.split('/')[0];
-           monthStr = `${monthNum}月`;
+           monthStr = `${detail.date.split('/')[0]}月`;
         }
 
         if (!analyzedData[terminal]) analyzedData[terminal] = {};
         if (!analyzedData[terminal][monthStr]) {
-          analyzedData[terminal][monthStr] = { '早班': {s:0, p:0}, '中班': {s:0, p:0}, '夜班': {s:0, p:0} };
+          analyzedData[terminal][monthStr] = { 
+            '早班': {s:0, p:0, dates:[]}, 
+            '中班': {s:0, p:0, dates:[]}, 
+            '夜班': {s:0, p:0, dates:[]} 
+          };
         }
         
         if (analyzedData[terminal][monthStr][shift]) {
           analyzedData[terminal][monthStr][shift].s += 1;
           analyzedData[terminal][monthStr][shift].p += people;
+          if (detail.date) analyzedData[terminal][monthStr][shift].dates.push(detail.date);
         }
       });
 
-      // 2. 針對每一個航廈繪製獨立的統計卡片
       const terminals = Object.keys(analyzedData).sort();
       
       terminals.forEach(terminal => {
@@ -225,11 +252,14 @@
         table.innerHTML = `
           <thead>
             <tr>
-              <th rowspan="2" width="15%">月份</th>
+              <th rowspan="2" width="10%">月份</th>
               <th colspan="2">早班</th><th colspan="2">中班</th><th colspan="2">夜班</th><th colspan="2" class="total-col">合計</th>
             </tr>
             <tr>
-              <th>場次</th><th>人數</th><th>場次</th><th>人數</th><th>場次</th><th>人數</th><th class="total-col">場次</th><th class="total-col">人數</th>
+              <th width="12%">場次(日期)</th><th>人數</th>
+              <th width="12%">場次(日期)</th><th>人數</th>
+              <th width="12%">場次(日期)</th><th>人數</th>
+              <th class="total-col">場次</th><th class="total-col">人數</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -249,25 +279,22 @@
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${month}</td>
-            <td>${formatNum(mData['早班'].s)}</td><td>${formatNum(mData['早班'].p)}</td>
-            <td>${formatNum(mData['中班'].s)}</td><td>${formatNum(mData['中班'].p)}</td>
-            <td>${formatNum(mData['夜班'].s)}</td><td>${formatNum(mData['夜班'].p)}</td>
-            <td class="total-col">${formatNum(msSess)}</td><td class="total-col">${formatNum(msPeop)}</td>
+            <td>${formatCellWithDates(mData['早班'].s, mData['早班'].dates)}</td>
+            <td>${mData['早班'].p > 0 ? `<span class="highlight-num">${mData['早班'].p}</span>` : '0'}</td>
+            <td>${formatCellWithDates(mData['中班'].s, mData['中班'].dates)}</td>
+            <td>${mData['中班'].p > 0 ? `<span class="highlight-num">${mData['中班'].p}</span>` : '0'}</td>
+            <td>${formatCellWithDates(mData['夜班'].s, mData['夜班'].dates)}</td>
+            <td>${mData['夜班'].p > 0 ? `<span class="highlight-num">${mData['夜班'].p}</span>` : '0'}</td>
+            <td class="total-col">${msSess}</td><td class="total-col">${msPeop}</td>
           `;
           tbody.appendChild(tr);
           tSess += msSess;
           tPeop += msPeop;
         });
 
-        // 底部合計
         const footer = document.createElement('tr');
-        footer.innerHTML = `
-          <td style="font-weight:bold; background:#eef2f5;">小計</td>
-          <td colspan="6" style="background:#eef2f5;"></td>
-          <td class="total-col">${tSess}</td><td class="total-col">${tPeop}</td>
-        `;
+        footer.innerHTML = `<td style="font-weight:bold; background:#eef2f5;">小計</td><td colspan="6" style="background:#eef2f5;"></td><td class="total-col">${tSess}</td><td class="total-col">${tPeop}</td>`;
         tbody.appendChild(footer);
-        
         card.appendChild(table);
         modalBody.appendChild(card);
       });
@@ -278,7 +305,7 @@
     function closeModal() { document.getElementById('courseModal').classList.remove('active'); }
     window.onclick = function(event) { if (event.target === document.getElementById('courseModal')) closeModal(); }
 
-    // 產生月報表卡片 (外層主頁面使用)
+    // 主頁面產生表格
     function createStatsTable(monthsData, title, titleClass = "", cardClass = "") {
       const card = document.createElement('div');
       card.className = `card ${cardClass}`;
@@ -300,7 +327,8 @@
         let monthSessions = 0, monthPeople = 0;
         ['早班', '中班', '夜班'].forEach(shift => {
           const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
-          tr.innerHTML += `<td>${formatNum(stats.sessions)}</td><td>${formatNum(stats.people)}</td>`;
+          tr.innerHTML += `<td>${stats.sessions > 0 ? `<span class="highlight-num">${stats.sessions}</span>` : "0"}</td>
+                           <td>${stats.people > 0 ? `<span class="highlight-num">${stats.people}</span>` : "0"}</td>`;
           monthSessions += stats.sessions;
           monthPeople += stats.people;
         });
@@ -316,25 +344,83 @@
       return card;
     }
 
-    // 主程式 API 讀取
+    // Chart.js 共同設定檔 (雙 Y 軸)
+    const commonChartOptions = {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        ySessions: { type: 'linear', display: true, position: 'left', title: { display: true, text: '總場次 (次)' }, suggestedMin: 0 },
+        yPeople: { type: 'linear', display: true, position: 'right', title: { display: true, text: '總人數 (人)' }, grid: { drawOnChartArea: false }, suggestedMin: 0 }
+      }
+    };
+
+    // 主程式
     fetch(GAS_URL)
       .then(response => response.json())
       .then(data => {
         document.getElementById('loading').style.display = 'none';
         const contentDiv = document.getElementById('content');
+        const sortedYears = Object.keys(data).sort();
+        
+        // ----------------------------------------------------
+        // 1. 繪製頂部「歷年教育訓練趨勢 (年曲線圖)」
+        // ----------------------------------------------------
+        const yearlyLabels = [];
+        const yearlySessions = [];
+        const yearlyPeople = [];
+
+        sortedYears.forEach(year => {
+          let yS = 0, yP = 0;
+          const terminals = data[year].stats;
+          Object.values(terminals).forEach(months => {
+            Object.values(months).forEach(shiftData => {
+              ['早班', '中班', '夜班'].forEach(shift => {
+                yS += (shiftData[shift]?.sessions || 0);
+                yP += (shiftData[shift]?.people || 0);
+              });
+            });
+          });
+          yearlyLabels.push(`${year}年`);
+          yearlySessions.push(yS);
+          yearlyPeople.push(yP);
+        });
+
+        const globalChartCard = document.createElement('div');
+        globalChartCard.className = 'card card-chart';
+        globalChartCard.innerHTML = `
+          <h2 class="title-chart">📈 歷年教育訓練總體趨勢 (年曲線圖)</h2>
+          <div class="chart-container"><canvas id="yearlyChart"></canvas></div>
+        `;
+        contentDiv.appendChild(globalChartCard);
+
+        new Chart(document.getElementById('yearlyChart').getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: yearlyLabels,
+            datasets: [
+              { label: '總人數', data: yearlyPeople, borderColor: '#d9534f', backgroundColor: 'rgba(217,83,79,0.1)', yAxisID: 'yPeople', tension: 0.3, fill: true },
+              { label: '總場次', data: yearlySessions, borderColor: '#0056b3', backgroundColor: '#0056b3', yAxisID: 'ySessions', tension: 0.3, borderDash: [5, 5] }
+            ]
+          },
+          options: commonChartOptions
+        });
+
+        // ----------------------------------------------------
+        // 2. 建立年度頁籤與內容區塊
+        // ----------------------------------------------------
         const tabsContainer = document.createElement('div');
         tabsContainer.className = 'tab-container';
         contentDiv.appendChild(tabsContainer);
         const sectionsContainer = document.createElement('div');
         contentDiv.appendChild(sectionsContainer);
         
-        const sortedYears = Object.keys(data).sort();
         let isFirst = true;
 
         sortedYears.forEach(year => {
           const btn = document.createElement('button');
           btn.className = `tab-btn ${isFirst ? 'active' : ''}`;
-          btn.textContent = `📅 ${year}年度`;
+          btn.textContent = `📅 ${year}年度報表`;
           btn.onclick = () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.year-section').forEach(s => s.classList.remove('active'));
@@ -351,25 +437,68 @@
           const yearCourses = data[year].courses;
           const terminals = Object.keys(yearStats).sort();
 
+          // -- 產生該年度的「月曲線圖」 --
+          const monthlyLabels = ['01月', '02月', '03月', '04月', '05月', '06月', '07月', '08月', '09月', '10月', '11月', '12月'];
+          const monthlySessions = new Array(12).fill(0);
+          const monthlyPeople = new Array(12).fill(0);
+
           const combinedStats = {};
           terminals.forEach(terminal => {
             for (const [month, shiftData] of Object.entries(yearStats[terminal])) {
               if (!combinedStats[month]) combinedStats[month] = { '早班': {sessions:0, people:0}, '中班': {sessions:0, people:0}, '夜班': {sessions:0, people:0} };
+              
+              const mIndex = parseInt(month.replace('月', '')) - 1;
+
               ['早班', '中班', '夜班'].forEach(shift => {
-                combinedStats[month][shift].sessions += (shiftData[shift]?.sessions || 0);
-                combinedStats[month][shift].people += (shiftData[shift]?.people || 0);
+                const s = shiftData[shift]?.sessions || 0;
+                const p = shiftData[shift]?.people || 0;
+                combinedStats[month][shift].sessions += s;
+                combinedStats[month][shift].people += p;
+                
+                if (mIndex >= 0 && mIndex < 12) {
+                  monthlySessions[mIndex] += s;
+                  monthlyPeople[mIndex] += p;
+                }
               });
             }
           });
-          if (Object.keys(combinedStats).length > 0) {
-            yearSection.appendChild(createStatsTable(combinedStats, "📊 全區加總 (一航 ＋ 二航)", "title-total", "card-total"));
-          }
 
+          // 過濾掉未發生的月份 (例如2026年只有到10月)
+          const validMonths = Object.keys(combinedStats).length;
+          const activeLabels = monthlyLabels.slice(0, validMonths > 0 ? 12 : 0);
+          
+          const monthChartCard = document.createElement('div');
+          monthChartCard.className = 'card card-chart';
+          monthChartCard.innerHTML = `
+            <h2 class="title-chart">📊 ${year}年度 各月訓練執行趨勢 (月曲線圖)</h2>
+            <div class="chart-container"><canvas id="monthlyChart-${year}"></canvas></div>
+          `;
+          yearSection.appendChild(monthChartCard);
+
+          // 繪製月曲線圖 (延遲一小段時間確保 DOM 已掛載)
+          setTimeout(() => {
+            new Chart(document.getElementById(`monthlyChart-${year}`).getContext('2d'), {
+              type: 'bar',
+              data: {
+                labels: activeLabels,
+                datasets: [
+                  { type: 'line', label: '總人數', data: monthlyPeople.slice(0, activeLabels.length), borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.1)', yAxisID: 'yPeople', tension: 0.4, fill: true },
+                  { type: 'bar', label: '總場次', data: monthlySessions.slice(0, activeLabels.length), backgroundColor: '#17a2b8', yAxisID: 'ySessions', borderRadius: 4 }
+                ]
+              },
+              options: commonChartOptions
+            });
+          }, 100);
+
+          // -- 報表表格 --
+          if (Object.keys(combinedStats).length > 0) {
+            yearSection.appendChild(createStatsTable(combinedStats, "📋 全區加總 (一航 ＋ 二航)", "title-total", "card-total"));
+          }
           terminals.forEach(terminal => {
             yearSection.appendChild(createStatsTable(yearStats[terminal], `📍 ${terminal}`, "", "card-terminal"));
           });
 
-          // 處理課程排行與明細
+          // -- 課程排行與明細 --
           const combinedCourses = {};
           terminals.forEach(terminal => {
             if (yearCourses[terminal]) {
@@ -395,7 +524,7 @@
           if (sortedCourses.length > 0) {
             const courseCard = document.createElement('div');
             courseCard.className = 'card card-course';
-            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (依 SOP 歸類) <span class="click-hint">👆 點擊表格任一列，可查看分航廈、月份、班別明細</span></h2>`;
+            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (依 SOP 歸類) <span class="click-hint">👆 點擊表格任一列，可查看包含「確切日期」的詳細統計</span></h2>`;
             
             const courseTable = document.createElement('table');
             courseTable.className = 'course-table';
@@ -411,8 +540,8 @@
               tr.innerHTML = `
                 <td class="rank-num">${index + 1}</td>
                 <td style="text-align: left; font-weight: 500; color: #0056b3;">${cName}</td>
-                <td>${stats.sessions}</td>
-                <td>${stats.people}</td>
+                <td><span class="highlight-num">${stats.sessions}</span></td>
+                <td><span class="highlight-num">${stats.people}</span></td>
               `;
               cTbody.appendChild(tr);
             });
