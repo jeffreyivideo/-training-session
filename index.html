@@ -6,9 +6,25 @@
   <title>航廈教育訓練統計儀表板</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; color: #333; }
-    h1 { text-align: center; color: #2c3e50; font-weight: bold; }
+    h1 { text-align: center; color: #2c3e50; font-weight: bold; margin-bottom: 30px; }
+    
+    /* 頁籤設計 */
+    .tab-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 25px; justify-content: center; }
+    .tab-btn { 
+      padding: 10px 25px; cursor: pointer; border: 2px solid #0056b3; 
+      background: #fff; color: #0056b3; border-radius: 8px; 
+      font-size: 16px; font-weight: bold; transition: all 0.2s ease-in-out; 
+    }
+    .tab-btn:hover { background: #e6f0fa; transform: translateY(-2px); }
+    .tab-btn.active { background: #0056b3; color: white; box-shadow: 0 4px 10px rgba(0,86,179,0.3); }
+    
+    /* 區塊顯示控制 */
+    .year-section { display: none; animation: fadeIn 0.4s ease-in-out; }
+    .year-section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
     .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-    h2 { color: #0056b3; border-left: 4px solid #0056b3; padding-left: 10px; }
+    h2 { color: #0056b3; border-left: 4px solid #0056b3; padding-left: 10px; margin-top: 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: center; }
     th { background-color: #f8f9fa; color: #495057; font-weight: 600; }
@@ -24,7 +40,7 @@
   </div>
 
   <script>
-    // ⚠️ 貼上您剛剛在 Google Apps Script 複製的網址
+    // ⚠️ 貼上您的 Google Apps Script 網頁應用程式網址
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXg47GxjMju-NFoGnOp6CO5AyFZZ6PrqKMH2qBI3CncaFFoTISIPT3TBiQ-2h_CFIVJw/exec';
 
     fetch(GAS_URL)
@@ -33,77 +49,133 @@
         document.getElementById('loading').style.display = 'none';
         const contentDiv = document.getElementById('content');
         
-        // 遍歷各個工作表 (例如: 一航, 二航, 114年-一航)
-        for (const [sheetName, monthsData] of Object.entries(data)) {
-          const card = document.createElement('div');
-          card.className = 'card';
-          
-          card.innerHTML = `<h2>${sheetName}</h2>`;
-          
-          const table = document.createElement('table');
-          table.innerHTML = `
-            <thead>
-              <tr>
-                <th rowspan="2">年度 / 月份</th>
-                <th colspan="2">早班</th>
-                <th colspan="2">中班</th>
-                <th colspan="2">夜班</th>
-                <th colspan="2" class="total-col">月總計</th>
-              </tr>
-              <tr>
-                <th>場次</th><th>人數</th>
-                <th>場次</th><th>人數</th>
-                <th>場次</th><th>人數</th>
-                <th class="total-col">總場次</th><th class="total-col">總人數</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          `;
-          
-          const tbody = table.querySelector('tbody');
-          
-          // 將月份排序 (例如: 2023年 08月 -> 2023年 09月)
-          const sortedMonths = Object.keys(monthsData).sort((a, b) => a.localeCompare(b));
-          
-          let yearTotalSessions = 0;
-          let yearTotalPeople = 0;
+        // 1. 將資料重新依照「年度」進行分類與重組
+        const dataByYear = {};
 
-          sortedMonths.forEach(month => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${month}</td>`;
-            
-            let monthSessions = 0;
-            let monthPeople = 0;
-            
-            ['早班', '中班', '夜班'].forEach(shift => {
-              const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
-              tr.innerHTML += `<td>${stats.sessions}</td><td>${stats.people}</td>`;
+        for (const [sheetName, monthsData] of Object.entries(data)) {
+          for (const [yearMonth, shifts] of Object.entries(monthsData)) {
+            // 解析 "2025年 01月" -> year="2025", month="01月"
+            const parts = yearMonth.split(' ');
+            if (parts.length === 2) {
+              const year = parts[0].replace('年', '');
+              const month = parts[1];
+
+              if (!dataByYear[year]) dataByYear[year] = {};
+              if (!dataByYear[year][sheetName]) dataByYear[year][sheetName] = {};
               
-              monthSessions += stats.sessions;
-              monthPeople += stats.people;
+              dataByYear[year][sheetName][month] = shifts;
+            }
+          }
+        }
+
+        // 2. 建立年度切換頁籤 (Tabs)
+        const tabsContainer = document.createElement('div');
+        tabsContainer.className = 'tab-container';
+        contentDiv.appendChild(tabsContainer);
+
+        const sectionsContainer = document.createElement('div');
+        contentDiv.appendChild(sectionsContainer);
+
+        // 取得所有年份 (例如: 2023, 2024, 2025, 2026) 並排序
+        const sortedYears = Object.keys(dataByYear).sort();
+        let isFirst = true;
+
+        sortedYears.forEach(year => {
+          // --- 產生頁籤按鈕 ---
+          const btn = document.createElement('button');
+          btn.className = `tab-btn ${isFirst ? 'active' : ''}`;
+          btn.textContent = `${year}年度`;
+          btn.onclick = () => {
+            // 切換時清除所有 active 狀態，並啟動對應的年份區塊
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.year-section').forEach(s => s.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(`year-${year}`).classList.add('active');
+          };
+          tabsContainer.appendChild(btn);
+
+          // --- 產生該年度的資料區塊 ---
+          const yearSection = document.createElement('div');
+          yearSection.id = `year-${year}`;
+          yearSection.className = `year-section ${isFirst ? 'active' : ''}`;
+
+          const sheets = dataByYear[year];
+          
+          // 遍歷該年度下的各個表單 (一航、二航等)
+          for (const [sheetName, monthsData] of Object.entries(sheets)) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `<h2>${sheetName}</h2>`;
+            
+            const table = document.createElement('table');
+            table.innerHTML = `
+              <thead>
+                <tr>
+                  <th rowspan="2">月份</th>
+                  <th colspan="2">早班</th>
+                  <th colspan="2">中班</th>
+                  <th colspan="2">夜班</th>
+                  <th colspan="2" class="total-col">月總計</th>
+                </tr>
+                <tr>
+                  <th>場次</th><th>人數</th>
+                  <th>場次</th><th>人數</th>
+                  <th>場次</th><th>人數</th>
+                  <th class="total-col">總場次</th><th class="total-col">總人數</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            `;
+            
+            const tbody = table.querySelector('tbody');
+            
+            // 排序月份 (確保 01月 到 12月 順序正確)
+            const sortedMonths = Object.keys(monthsData).sort();
+            
+            let yearTotalSessions = 0;
+            let yearTotalPeople = 0;
+
+            sortedMonths.forEach(month => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `<td>${month}</td>`;
+              
+              let monthSessions = 0;
+              let monthPeople = 0;
+              
+              ['早班', '中班', '夜班'].forEach(shift => {
+                const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
+                tr.innerHTML += `<td>${stats.sessions}</td><td>${stats.people}</td>`;
+                
+                monthSessions += stats.sessions;
+                monthPeople += stats.people;
+              });
+              
+              // 該月的總計
+              tr.innerHTML += `<td class="total-col">${monthSessions}</td><td class="total-col">${monthPeople}</td>`;
+              tbody.appendChild(tr);
+
+              // 累加該年度的總計
+              yearTotalSessions += monthSessions;
+              yearTotalPeople += monthPeople;
             });
             
-            // 月總計欄位
-            tr.innerHTML += `<td class="total-col">${monthSessions}</td><td class="total-col">${monthPeople}</td>`;
-            tbody.appendChild(tr);
-
-            yearTotalSessions += monthSessions;
-            yearTotalPeople += monthPeople;
-          });
+            // 底部年度總累計列
+            const footerTr = document.createElement('tr');
+            footerTr.innerHTML = `
+              <td style="font-weight: bold; background: #eef2f5;">${year}年累計</td>
+              <td colspan="6" style="background: #eef2f5;"></td>
+              <td class="total-col">${yearTotalSessions}</td>
+              <td class="total-col">${yearTotalPeople}</td>
+            `;
+            tbody.appendChild(footerTr);
+            
+            card.appendChild(table);
+            yearSection.appendChild(card);
+          }
           
-          // 加入底部總計列
-          const footerTr = document.createElement('tr');
-          footerTr.innerHTML = `
-            <td style="font-weight: bold; background: #eef2f5;">總累計</td>
-            <td colspan="6" style="background: #eef2f5;"></td>
-            <td class="total-col">${yearTotalSessions}</td>
-            <td class="total-col">${yearTotalPeople}</td>
-          `;
-          tbody.appendChild(footerTr);
-          
-          card.appendChild(table);
-          contentDiv.appendChild(card);
-        }
+          sectionsContainer.appendChild(yearSection);
+          isFirst = false; // 只有第一個年份會預設顯示
+        });
       })
       .catch(error => {
         document.getElementById('loading').textContent = '讀取失敗，請確認 Apps Script API 權限或網址是否正確。';
