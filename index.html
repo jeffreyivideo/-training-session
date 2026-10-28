@@ -23,11 +23,23 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
     .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    .card-total { border-top: 5px solid #28a745; } /* 總計卡片加上綠邊 */
+    .card-course { border-top: 5px solid #ffc107; } /* 課程卡片加上黃邊 */
+    
     h2 { color: #0056b3; border-left: 4px solid #0056b3; padding-left: 10px; margin-top: 0; }
+    .title-total { color: #28a745; border-color: #28a745; }
+    .title-course { color: #d39e00; border-color: #ffc107; }
+
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: center; }
     th { background-color: #f8f9fa; color: #495057; font-weight: 600; }
     .total-col { background-color: #eef2f5; font-weight: bold; color: #0056b3; }
+    
+    /* 課程排行表特殊樣式 */
+    .course-table th { background-color: #fff8e1; }
+    .course-table tr:hover { background-color: #fdfbf5; }
+    .rank-num { font-weight: bold; color: #666; }
+
     .loading { text-align: center; padding: 40px; font-size: 1.2em; color: #666; }
   </style>
 </head>
@@ -42,13 +54,73 @@
     // ⚠️ 記得將下方換成您最新發佈的 GAS 網頁應用程式網址
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXg47GxjMju-NFoGnOp6CO5AyFZZ6PrqKMH2qBI3CncaFFoTISIPT3TBiQ-2h_CFIVJw/exec';
 
+    // 負責產生統計表格 HTML 的函數
+    function createStatsTable(monthsData, title, titleClass = "", cardClass = "") {
+      const card = document.createElement('div');
+      card.className = `card ${cardClass}`;
+      card.innerHTML = `<h2 class="${titleClass}">${title}</h2>`;
+      
+      const table = document.createElement('table');
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th rowspan="2">月份</th>
+            <th colspan="2">早班</th>
+            <th colspan="2">中班</th>
+            <th colspan="2">夜班</th>
+            <th colspan="2" class="total-col">月總計</th>
+          </tr>
+          <tr>
+            <th>場次</th><th>人數</th>
+            <th>場次</th><th>人數</th>
+            <th>場次</th><th>人數</th>
+            <th class="total-col">總場次</th><th class="total-col">總人數</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      
+      const tbody = table.querySelector('tbody');
+      const sortedMonths = Object.keys(monthsData).sort();
+      let yearTotalSessions = 0, yearTotalPeople = 0;
+
+      sortedMonths.forEach(month => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${month}</td>`;
+        let monthSessions = 0, monthPeople = 0;
+        
+        ['早班', '中班', '夜班'].forEach(shift => {
+          const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
+          tr.innerHTML += `<td>${stats.sessions}</td><td>${stats.people}</td>`;
+          monthSessions += stats.sessions;
+          monthPeople += stats.people;
+        });
+        
+        tr.innerHTML += `<td class="total-col">${monthSessions}</td><td class="total-col">${monthPeople}</td>`;
+        tbody.appendChild(tr);
+
+        yearTotalSessions += monthSessions;
+        yearTotalPeople += monthPeople;
+      });
+      
+      const footerTr = document.createElement('tr');
+      footerTr.innerHTML = `
+        <td style="font-weight: bold; background: #eef2f5;">年度累計</td>
+        <td colspan="6" style="background: #eef2f5;"></td>
+        <td class="total-col" style="font-size:1.1em;">${yearTotalSessions}</td>
+        <td class="total-col" style="font-size:1.1em;">${yearTotalPeople}</td>
+      `;
+      tbody.appendChild(footerTr);
+      card.appendChild(table);
+      return card;
+    }
+
     fetch(GAS_URL)
       .then(response => response.json())
       .then(data => {
         document.getElementById('loading').style.display = 'none';
         const contentDiv = document.getElementById('content');
         
-        // 建立年份切換頁籤與內容區塊
         const tabsContainer = document.createElement('div');
         tabsContainer.className = 'tab-container';
         contentDiv.appendChild(tabsContainer);
@@ -60,7 +132,7 @@
         let isFirst = true;
 
         sortedYears.forEach(year => {
-          // --- 產生頁籤按鈕 ---
+          // --- 產生頁籤 ---
           const btn = document.createElement('button');
           btn.className = `tab-btn ${isFirst ? 'active' : ''}`;
           btn.textContent = `${year}年度`;
@@ -72,83 +144,95 @@
           };
           tabsContainer.appendChild(btn);
 
-          // --- 產生該年份的內容區塊 ---
+          // --- 產生該年份內容 ---
           const yearSection = document.createElement('div');
           yearSection.id = `year-${year}`;
           yearSection.className = `year-section ${isFirst ? 'active' : ''}`;
 
-          const terminals = data[year]; // { 一航: {...}, 二航: {...} }
-          const sortedTerminals = Object.keys(terminals).sort();
+          const yearStats = data[year].stats;
+          const yearCourses = data[year].courses;
+          const terminals = Object.keys(yearStats).sort();
 
-          sortedTerminals.forEach(terminal => {
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.innerHTML = `<h2>${terminal}</h2>`;
+          // 1. 計算全區加總 (一航 + 二航)
+          const combinedStats = {};
+          terminals.forEach(terminal => {
+            for (const [month, shiftData] of Object.entries(yearStats[terminal])) {
+              if (!combinedStats[month]) {
+                combinedStats[month] = { '早班': {sessions:0, people:0}, '中班': {sessions:0, people:0}, '夜班': {sessions:0, people:0} };
+              }
+              ['早班', '中班', '夜班'].forEach(shift => {
+                combinedStats[month][shift].sessions += (shiftData[shift]?.sessions || 0);
+                combinedStats[month][shift].people += (shiftData[shift]?.people || 0);
+              });
+            }
+          });
+
+          // 繪製「全區加總」卡片
+          if (Object.keys(combinedStats).length > 0) {
+            yearSection.appendChild(createStatsTable(combinedStats, "全區加總 (一航 ＋ 二航)", "title-total", "card-total"));
+          }
+
+          // 2. 繪製各航廈獨立卡片 (一航、二航)
+          terminals.forEach(terminal => {
+            yearSection.appendChild(createStatsTable(yearStats[terminal], terminal));
+          });
+
+          // 3. 處理與繪製「各訓練課程」統計
+          const combinedCourses = {};
+          terminals.forEach(terminal => {
+            if (yearCourses[terminal]) {
+              for (const [courseName, courseStats] of Object.entries(yearCourses[terminal])) {
+                if (!combinedCourses[courseName]) combinedCourses[courseName] = { sessions: 0, people: 0 };
+                combinedCourses[courseName].sessions += courseStats.sessions;
+                combinedCourses[courseName].people += courseStats.people;
+              }
+            }
+          });
+
+          const sortedCourses = Object.keys(combinedCourses).sort((a, b) => {
+            // 依照場次降冪排序，場次相同則依人數排序
+            if (combinedCourses[b].sessions !== combinedCourses[a].sessions) {
+              return combinedCourses[b].sessions - combinedCourses[a].sessions;
+            }
+            return combinedCourses[b].people - combinedCourses[a].people;
+          });
+
+          if (sortedCourses.length > 0) {
+            const courseCard = document.createElement('div');
+            courseCard.className = 'card card-course';
+            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (全區)</h2>`;
             
-            const table = document.createElement('table');
-            table.innerHTML = `
+            const courseTable = document.createElement('table');
+            courseTable.className = 'course-table';
+            courseTable.innerHTML = `
               <thead>
                 <tr>
-                  <th rowspan="2">月份</th>
-                  <th colspan="2">早班</th>
-                  <th colspan="2">中班</th>
-                  <th colspan="2">夜班</th>
-                  <th colspan="2" class="total-col">月總計</th>
-                </tr>
-                <tr>
-                  <th>場次</th><th>人數</th>
-                  <th>場次</th><th>人數</th>
-                  <th>場次</th><th>人數</th>
-                  <th class="total-col">總場次</th><th class="total-col">總人數</th>
+                  <th width="10%">排名</th>
+                  <th width="50%" style="text-align: left;">訓練課程名稱</th>
+                  <th width="20%">累計場次</th>
+                  <th width="20%">受訓總人數</th>
                 </tr>
               </thead>
               <tbody></tbody>
             `;
             
-            const tbody = table.querySelector('tbody');
-            const monthsData = terminals[terminal];
-            
-            // 確保 01月 到 12月 排序正確
-            const sortedMonths = Object.keys(monthsData).sort();
-            
-            let yearTotalSessions = 0;
-            let yearTotalPeople = 0;
-
-            sortedMonths.forEach(month => {
+            const cTbody = courseTable.querySelector('tbody');
+            sortedCourses.forEach((cName, index) => {
+              const stats = combinedCourses[cName];
               const tr = document.createElement('tr');
-              tr.innerHTML = `<td>${month}</td>`;
-              
-              let monthSessions = 0;
-              let monthPeople = 0;
-              
-              ['早班', '中班', '夜班'].forEach(shift => {
-                const stats = monthsData[month][shift] || { sessions: 0, people: 0 };
-                tr.innerHTML += `<td>${stats.sessions}</td><td>${stats.people}</td>`;
-                monthSessions += stats.sessions;
-                monthPeople += stats.people;
-              });
-              
-              tr.innerHTML += `<td class="total-col">${monthSessions}</td><td class="total-col">${monthPeople}</td>`;
-              tbody.appendChild(tr);
-
-              yearTotalSessions += monthSessions;
-              yearTotalPeople += monthPeople;
+              tr.innerHTML = `
+                <td class="rank-num">${index + 1}</td>
+                <td style="text-align: left; font-weight: 500;">${cName}</td>
+                <td>${stats.sessions}</td>
+                <td>${stats.people}</td>
+              `;
+              cTbody.appendChild(tr);
             });
             
-            // 年度總計
-            const footerTr = document.createElement('tr');
-            footerTr.innerHTML = `
-              <td style="font-weight: bold; background: #eef2f5;">${year}年累計</td>
-              <td colspan="6" style="background: #eef2f5;"></td>
-              <td class="total-col">${yearTotalSessions}</td>
-              <td class="total-col">${yearTotalPeople}</td>
-            `;
-            tbody.appendChild(footerTr);
-            
-            card.appendChild(table);
-            yearSection.appendChild(card);
-          });
-          
+            courseCard.appendChild(courseTable);
+            yearSection.appendChild(courseCard);
+          }
+
           sectionsContainer.appendChild(yearSection);
           isFirst = false;
         });
