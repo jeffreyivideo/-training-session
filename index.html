@@ -54,7 +54,34 @@
     // ⚠️ 記得將下方換成您最新發佈的 GAS 網頁應用程式網址
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXg47GxjMju-NFoGnOp6CO5AyFZZ6PrqKMH2qBI3CncaFFoTISIPT3TBiQ-2h_CFIVJw/exec';
 
-    // 負責產生統計表格 HTML 的函數
+    // 🌟 新增：課程名稱統一歸類函數 🌟
+    // 只要原始名稱包含特定「關鍵字」，就會被轉換成統一的標準名稱
+    function normalizeCourseName(rawName) {
+      if (!rawName) return "其他/未分類";
+      let n = rawName.toString().trim();
+      
+      // --- 1. 關鍵字歸類規則 (您可以在此自由新增或修改) ---
+      if (n.includes("抹布") && (n.includes("分色") || n.includes("顏色"))) return "抹布分色與八折法使用";
+      if (n.includes("免治馬桶")) return "免治馬桶清潔與維護";
+      if (n.includes("垃圾報表")) return "垃圾報表處置宣導";
+      if (n.includes("警報按鈕") || n.includes("復歸")) return "警報按鈕復歸教學";
+      if (n.includes("小心地滑") || n.includes("吸水紙")) return "防滑與吸水紙使用注意事項";
+      if (n.includes("洗手間接觸點") || n.includes("鏡面及洗手台") || n.includes("擦手紙更換") || n.includes("潔具間")) return "洗手間各項設施清潔 (綜合)";
+      if (n.includes("地面清洗") || n.includes("洗地")) return "地面清洗作業安全防護";
+      if (n.includes("管制證")) return "管制證使用注意事項";
+      if (n.includes("禮儀") || n.includes("禮節")) return "服務禮儀與應對技巧";
+
+      // --- 2. 通用文字過濾 (如果上面沒命中，則自動清掉多餘的字尾) ---
+      // 把常見的贅字去掉，例如「XX教育訓練」跟「XX」就會自動變成一樣
+      n = n.replace(/教育訓練$/g, "");
+      n = n.replace(/宣導$/g, "");
+      n = n.replace(/教學$/g, "");
+      n = n.replace(/注意事項$/g, "");
+      
+      return n.trim();
+    }
+
+    // 負責產生月統計表格 HTML 的函數
     function createStatsTable(monthsData, title, titleClass = "", cardClass = "") {
       const card = document.createElement('div');
       card.className = `card ${cardClass}`;
@@ -98,7 +125,6 @@
         
         tr.innerHTML += `<td class="total-col">${monthSessions}</td><td class="total-col">${monthPeople}</td>`;
         tbody.appendChild(tr);
-
         yearTotalSessions += monthSessions;
         yearTotalPeople += monthPeople;
       });
@@ -132,7 +158,6 @@
         let isFirst = true;
 
         sortedYears.forEach(year => {
-          // --- 產生頁籤 ---
           const btn = document.createElement('button');
           btn.className = `tab-btn ${isFirst ? 'active' : ''}`;
           btn.textContent = `${year}年度`;
@@ -144,7 +169,6 @@
           };
           tabsContainer.appendChild(btn);
 
-          // --- 產生該年份內容 ---
           const yearSection = document.createElement('div');
           yearSection.id = `year-${year}`;
           yearSection.className = `year-section ${isFirst ? 'active' : ''}`;
@@ -153,7 +177,7 @@
           const yearCourses = data[year].courses;
           const terminals = Object.keys(yearStats).sort();
 
-          // 1. 計算全區加總 (一航 + 二航)
+          // 1. 全區加總月報表
           const combinedStats = {};
           terminals.forEach(terminal => {
             for (const [month, shiftData] of Object.entries(yearStats[terminal])) {
@@ -166,31 +190,34 @@
               });
             }
           });
-
-          // 繪製「全區加總」卡片
           if (Object.keys(combinedStats).length > 0) {
             yearSection.appendChild(createStatsTable(combinedStats, "全區加總 (一航 ＋ 二航)", "title-total", "card-total"));
           }
 
-          // 2. 繪製各航廈獨立卡片 (一航、二航)
+          // 2. 各航廈月報表
           terminals.forEach(terminal => {
             yearSection.appendChild(createStatsTable(yearStats[terminal], terminal));
           });
 
-          // 3. 處理與繪製「各訓練課程」統計
+          // 3. 🌟 課程排名 (導入歸類邏輯) 🌟
           const combinedCourses = {};
           terminals.forEach(terminal => {
             if (yearCourses[terminal]) {
-              for (const [courseName, courseStats] of Object.entries(yearCourses[terminal])) {
-                if (!combinedCourses[courseName]) combinedCourses[courseName] = { sessions: 0, people: 0 };
-                combinedCourses[courseName].sessions += courseStats.sessions;
-                combinedCourses[courseName].people += courseStats.people;
+              for (const [rawCourseName, courseStats] of Object.entries(yearCourses[terminal])) {
+                // 將原始名稱丟入我們寫好的函數進行清理與歸類
+                const cleanCourseName = normalizeCourseName(rawCourseName);
+                
+                if (!combinedCourses[cleanCourseName]) {
+                  combinedCourses[cleanCourseName] = { sessions: 0, people: 0 };
+                }
+                // 將場次與人數合併到「清理後的名稱」底下
+                combinedCourses[cleanCourseName].sessions += courseStats.sessions;
+                combinedCourses[cleanCourseName].people += courseStats.people;
               }
             }
           });
 
           const sortedCourses = Object.keys(combinedCourses).sort((a, b) => {
-            // 依照場次降冪排序，場次相同則依人數排序
             if (combinedCourses[b].sessions !== combinedCourses[a].sessions) {
               return combinedCourses[b].sessions - combinedCourses[a].sessions;
             }
@@ -200,7 +227,7 @@
           if (sortedCourses.length > 0) {
             const courseCard = document.createElement('div');
             courseCard.className = 'card card-course';
-            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (全區)</h2>`;
+            courseCard.innerHTML = `<h2 class="title-course">📚 訓練課程統計排行 (全區歸類後)</h2>`;
             
             const courseTable = document.createElement('table');
             courseTable.className = 'course-table';
@@ -228,7 +255,6 @@
               `;
               cTbody.appendChild(tr);
             });
-            
             courseCard.appendChild(courseTable);
             yearSection.appendChild(courseCard);
           }
